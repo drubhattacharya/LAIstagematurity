@@ -1,66 +1,757 @@
 <!doctype html>
-<!-- Single-file LAI Maturity Dashboard (Tier 1–3)
-     Save as index.html or upload directly to GitHub Pages -->
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LAI Maturity Dashboard — Single File (Tier 1–3)</title>
-<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js"></script>
-<style>
-:root{--blue:#1f7fd6;--green:#18a76f;--ink:#0b1f33;--muted:#2f4556;--border:rgba(11,31,51,.16);--bg1:#e7f3ff;--bg2:#e7fbf2;--card:#fff;--shadow:0 12px 28px rgba(11,31,51,.06);}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:
-radial-gradient(1100px 520px at 15% 10%,var(--bg1),rgba(255,255,255,0)),
-radial-gradient(1100px 520px at 85% 20%,var(--bg2),rgba(255,255,255,0)),
-linear-gradient(180deg,#fff,#f7fbff);color:var(--ink);font-size:16px;line-height:1.45;}
-header{padding:14px 18px 10px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.90);position:sticky;top:0;z-index:10;backdrop-filter:blur(8px);}
-h1{margin:0;font-size:20px}
-.sub{margin-top:4px;color:var(--muted);font-size:13px}
-.wrap{max-width:1240px;margin:0 auto;padding:14px 18px 40px}
-.grid{display:grid;gap:12px}
-.grid-2{grid-template-columns:1.1fr 1fr}
-@media(max-width:960px){.grid-2{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:14px}
-.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.tab{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 12px;font-weight:900;cursor:pointer;font-size:13px}
-.tab.active{border-color:rgba(31,127,214,.35);background:rgba(31,127,214,.08)}
-.hint{font-size:13px;color:var(--muted);margin-top:8px}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-@media(max-width:960px){.kpis{grid-template-columns:1fr}}
-.kpi{border:1px solid var(--border);border-radius:14px;padding:10px 12px;background:#fff}
-.kpi .label{font-size:12px;color:var(--muted);font-weight:800}
-.kpi .value{font-size:22px;font-weight:900;margin-top:2px}
-.pill{display:inline-block;padding:2px 10px;border-radius:999px;background:rgba(31,127,214,.10);border:1px solid rgba(31,127,214,.22);font-size:12px;font-weight:800}
-details{border:1px solid var(--border);border-radius:14px;padding:10px 12px;background:#fff;margin-top:10px}
-summary{cursor:pointer;font-weight:900;list-style:none}
-summary::-webkit-details-marker{display:none}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-.field{flex:1 1 320px;border:1px solid var(--border);border-radius:12px;padding:10px}
-.field label{display:flex;justify-content:space-between;gap:10px;font-weight:900;font-size:13px}
-.help{color:var(--muted);font-size:12px;margin-top:4px}
-input[type=range]{width:100%}
-input,select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:12px;font-size:14px;color:var(--ink);background:#fff}
-select option{color:var(--ink);background:#fff}
-.small{font-size:12px;color:var(--muted)}
-.good{color:var(--green);font-weight:900}
-.warn{color:#d78b00;font-weight:900}
-.bad{color:#d93b3b;font-weight:900}
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>LAI Dashboard — 3 Tiers (Overview • Pillar • Pulse)</title>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <style>
+    :root{
+      --blue:#1f7fd6; --green:#18a76f; --ink:#0b1f33; --muted:#2f4556;
+      --border:rgba(11,31,51,.16); --bg1:#e7f3ff; --bg2:#e7fbf2; --card:#ffffff;
+      --warn:#d78b00; --bad:#d93b3b;
+    }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background:
+        radial-gradient(1100px 520px at 15% 10%, var(--bg1), rgba(255,255,255,0)),
+        radial-gradient(1100px 520px at 85% 20%, var(--bg2), rgba(255,255,255,0)),
+        linear-gradient(180deg, #ffffff, #f7fbff);
+      color:var(--ink); font-size:16px; line-height:1.45;
+    }
+    header{
+      padding:14px 18px 12px 18px; border-bottom:1px solid var(--border);
+      background:rgba(255,255,255,.88); position:sticky; top:0; z-index:10; backdrop-filter: blur(8px);
+    }
+    .wrap{max-width:1250px;margin:0 auto;padding:14px 18px 40px;}
+    h1{margin:0;font-size:20px;}
+    .sub{margin-top:4px;color:var(--muted);font-size:13px;}
+    .tabs{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+    .tabbtn{
+      border:1px solid var(--border); background:#fff; border-radius:999px;
+      padding:8px 12px; font-weight:900; cursor:pointer;
+    }
+    .tabbtn.active{border-color:rgba(31,127,214,.35); background:rgba(31,127,214,.08);}
+    .grid{display:grid; gap:12px;}
+    .grid-2{grid-template-columns:1.15fr 1fr;}
+    @media (max-width: 980px){ .grid-2{grid-template-columns:1fr;} }
+    .card{
+      background:var(--card); border:1px solid var(--border); border-radius:16px;
+      box-shadow:0 12px 28px rgba(11,31,51,.06); padding:14px;
+    }
+    .kpis{display:grid; grid-template-columns: repeat(4,1fr); gap:10px;}
+    @media (max-width: 980px){ .kpis{grid-template-columns:1fr;} }
+    .kpi{border:1px solid var(--border); border-radius:14px; padding:10px 12px; background:#fff;}
+    .kpi .label{font-size:12px;color:var(--muted);font-weight:800;}
+    .kpi .value{font-size:22px;font-weight:900;margin-top:2px;}
+    .small{font-size:12px;color:var(--muted);}
+    .pill{
+      display:inline-block; padding:2px 10px; border-radius:999px;
+      background:rgba(31,127,214,.10); border:1px solid rgba(31,127,214,.22);
+      font-size:12px; font-weight:800;
+    }
+    .good{color:var(--green); font-weight:900;}
+    .warn{color:var(--warn); font-weight:900;}
+    .bad{color:var(--bad); font-weight:900;}
+    .btnbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+    button{
+      border:1px solid var(--border); background:#fff; border-radius:12px;
+      padding:8px 12px; font-weight:900; cursor:pointer;
+    }
+    button.primary{border-color:rgba(31,127,214,.35); background:rgba(31,127,214,.08);}
+    details{border:1px solid var(--border); border-radius:14px; padding:10px 12px; background:#fff; margin-top:10px;}
+    summary{cursor:pointer; font-weight:900; color:var(--ink); list-style:none;}
+    summary::-webkit-details-marker{display:none;}
+    .row{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+    .field{flex:1 1 320px; border:1px solid var(--border); border-radius:12px; padding:10px; background:#fff;}
+    .field label{display:flex; justify-content:space-between; gap:10px; font-weight:900; font-size:13px;}
+    .help{color:var(--muted); font-size:12px; margin-top:4px;}
+    input[type="range"]{width:100%;}
+    input, select{
+      width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:12px;
+      font-size:14px; color:var(--ink); background:#fff;
+    }
+    .view{display:none;}
+    .view.active{display:block;}
+    .split{display:grid; grid-template-columns: 1.1fr .9fr; gap:12px;}
+    @media (max-width: 980px){ .split{grid-template-columns:1fr;} }
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th,td{border:1px solid var(--border); padding:8px; vertical-align:top;}
+    th{background:rgba(31,127,214,.08); text-align:left;}
+    .callout{border:1px dashed rgba(11,31,51,.25); border-radius:14px; padding:10px 12px; background: rgba(255,255,255,.7);}
+    .mutedlink{color: var(--muted); text-decoration: underline; cursor: pointer; font-weight: 900;}
+  </style>
 </head>
+
 <body>
 <header>
   <div class="wrap" style="padding:0 18px;">
-    <h1>Language Access Index (LAI) — Maturity Dashboard</h1>
-    <div class="sub">Single file • Tier 1 (Snapshot) → Tier 2 (Workflow-evidenced) → Tier 3 (Data upload)</div>
+    <h1>Language Access Index (LAI) — 3-Tier Navigation Dashboard</h1>
+    <div class="sub">Tier 1: Overview • Tier 2: Pillar Deep Dive • Tier 3: LAI Pulse (readiness + maturity)</div>
+    <div class="tabs" aria-label="Navigation tabs">
+      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Overview</button>
+      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Pillar Deep Dive</button>
+      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — LAI Pulse</button>
+    </div>
   </div>
 </header>
 
 <div class="wrap">
-  <p class="small">
-    This is a <b>single-file</b> version of the LAI Maturity Dashboard.
-    Upload this file directly to GitHub Pages (rename to <code>index.html</code>) or open locally.
-  </p>
+  <!-- OVERVIEW -->
+  <section id="view_overview" class="view active">
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="btnbar">
+          <button class="primary" id="btn_reset">Reset to defaults</button>
+          <button id="btn_expand">Expand all pillars</button>
+          <button id="btn_collapse">Collapse all pillars</button>
+          <button id="btn_export_json">Export inputs (JSON)</button>
+          <button id="btn_export_csv">Export scores (CSV)</button>
+        </div>
+        <div class="small">
+          Adjust inputs below. Scores update instantly. Click any pillar title to open it, or click
+          <span class="mutedlink" id="jump_to_pillar">“Pillar Deep Dive”</span> to focus on one pillar.
+        </div>
+        <div id="pillars"></div>
+      </div>
+
+      <div class="card">
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">LAI Pulse</div>
+            <div class="value" id="lai_value">—</div>
+            <div class="small" id="lai_band">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Risk signal</div>
+            <div class="value" id="risk_label">—</div>
+            <div class="small">Based on LAI thresholds</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Maturity stage</div>
+            <div class="value" id="stage_label">—</div>
+            <div class="small" id="stage_desc">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Top 3 improvement opportunities</div>
+            <div class="small" id="opp_list">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;" id="gauge_overview"></div>
+        <div style="margin-top:10px;" id="bar_overview"></div>
+
+        <details>
+          <summary>Pillar KPI reference (inputs + weights)</summary>
+          <div style="margin-top:10px;">
+            <table id="kpi_table"></table>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- PILLAR DEEP DIVE -->
+  <section id="view_pillar" class="view">
+    <div class="grid">
+      <div class="card">
+        <div class="btnbar">
+          <button class="primary" id="btn_back_overview_1">← Back to Overview</button>
+          <button id="btn_go_pulse_1">Go to LAI Pulse →</button>
+        </div>
+
+        <div class="split">
+          <div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <div style="font-weight:900;">Select pillar</div>
+              <select id="pillar_select" style="max-width:420px;"></select>
+              <span class="pill" id="pillar_score_badge">—</span>
+            </div>
+            <div class="small" style="margin-top:6px;">
+              This view isolates one pillar, shows its two KPI scores, and highlights “what to move next.”
+            </div>
+
+            <div class="row" id="pillar_fields" style="margin-top:10px;"></div>
+
+            <div class="callout" style="margin-top:10px;">
+              <div style="font-weight:900;">Executive prompts (stage-aware)</div>
+              <div class="small" id="exec_prompts" style="margin-top:6px;">—</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="kpis" style="grid-template-columns:1fr; gap:10px;">
+              <div class="kpi">
+                <div class="label">Pillar score</div>
+                <div class="value" id="pillar_score_value">—</div>
+                <div class="small" id="pillar_score_band">—</div>
+              </div>
+              <div class="kpi">
+                <div class="label">Nearest maturity “gate”</div>
+                <div class="value" id="pillar_gate">—</div>
+                <div class="small">Next stage threshold for this pillar</div>
+              </div>
+            </div>
+            <div style="margin-top:10px;" id="pillar_gauge"></div>
+            <div style="margin-top:10px;" id="pillar_breakdown"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PULSE -->
+  <section id="view_pulse" class="view">
+    <div class="grid">
+      <div class="card">
+        <div class="btnbar">
+          <button class="primary" id="btn_back_overview_2">← Back to Overview</button>
+          <button id="btn_go_pillar_2">Go to Pillar Deep Dive →</button>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">LAI Pulse</div>
+            <div class="value" id="lai_value_2">—</div>
+            <div class="small" id="lai_band_2">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Risk signal</div>
+            <div class="value" id="risk_label_2">—</div>
+            <div class="small">Based on LAI thresholds</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Maturity stage</div>
+            <div class="value" id="stage_label_2">—</div>
+            <div class="small" id="stage_desc_2">—</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Stage gate rationale</div>
+            <div class="small" id="stage_rationale">—</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:10px;">
+          <div class="card" style="box-shadow:none;">
+            <div style="font-weight:900; margin-bottom:6px;">Pulse gauge</div>
+            <div id="gauge_pulse"></div>
+            <div class="small" style="margin-top:8px;">
+              Tip: Your stage is determined by LAI thresholds AND “weakest-link” pillar constraints.
+            </div>
+          </div>
+
+          <div class="card" style="box-shadow:none;">
+            <div style="font-weight:900; margin-bottom:6px;">Preparedness map (lowest pillars drive the gate)</div>
+            <div id="heatmap_pulse"></div>
+          </div>
+        </div>
+
+        <details>
+          <summary>Scoring assumptions (transparent)</summary>
+          <div class="small" style="margin-top:8px;">
+            <ul style="margin:0; padding-left:18px;">
+              <li>LAI = average of the 10 pillar scores.</li>
+              <li>Each pillar = weighted average of two KPIs (weights shown in the KPI reference table).</li>
+              <li>Stage maturity uses LAI thresholds plus a “weakest-link gate”: a stage cannot be claimed unless all pillars meet the stage’s minimum threshold.</li>
+              <li>This mirrors real-world maturity gating (capability requires consistent infrastructure across domains).</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
 </div>
+
+<script>
+  // ---- LAI metric schema (2 KPIs per pillar) ----
+  const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
+  const PILLAR_ORDER = ["Access","Patient Experience","Outcomes","Compliance","Patient Engagement","Financial Stewardship","Quality and Safety","Workforce Development","Workflow Optimization","Technology Innovation"];
+
+  // ---- Scoring helpers ----
+  function clamp(x, lo=0, hi=100){ return Math.max(lo, Math.min(hi, x)); }
+  function scorePercent(p){ return clamp(Number(p)||0,0,100); }
+  function scoreGapAbs(g, bands){
+    const a = Math.abs(Number(g)||0);
+    for (const [u,s] of bands){ if (a <= u) return clamp(s,0,100); }
+    return clamp(bands[bands.length-1][1],0,100);
+  }
+  function scoreDollars(v, cap){
+    v = Math.max(0, Number(v)||0);
+    cap = Math.max(1, Number(cap)||1);
+    return clamp((Math.log1p(v)/Math.log1p(cap))*100,0,100);
+  }
+  function scoreLikert(v, min=1, max=5){
+    v = Number(v)||min;
+    return clamp(((v-min)/Math.max(1,(max-min)))*100,0,100);
+  }
+  function readinessBand(lai){
+    if (lai >= 80) return ["High readiness","Lower risk","good"];
+    if (lai >= 60) return ["Moderate readiness","Moderate risk","warn"];
+    return ["Low readiness","Higher risk","bad"];
+  }
+
+  // ---- Stage maturity model (LAI threshold + weakest-link gate) ----
+  const STAGES = [
+    {name:"Stage 0", min:0,  label:"Unstable",          desc:"Reactive, inconsistent infrastructure; high variance by unit/service line."},
+    {name:"Stage 1", min:40, label:"Foundational",      desc:"Core capabilities exist, but performance is uneven; basic standardization underway."},
+    {name:"Stage 2", min:60, label:"Operational",       desc:"Reliable workflows across most touchpoints; measurable gains; fewer preventable failures."},
+    {name:"Stage 3", min:75, label:"Optimized",         desc:"Proactive monitoring, strong documentation fidelity, and predictable outcomes for LEP patients."},
+    {name:"Stage 4", min:85, label:"High-Reliability",  desc:"Sustained, audited, and continuously improved; resilient to demand surges and staffing shocks."}
+  ];
+  function stageFrom(lai, pillarScores){
+    let candidate = STAGES[0];
+    for (const s of STAGES){ if (lai >= s.min) candidate = s; }
+    const lowPillars = Object.entries(pillarScores).filter(([p,sc]) => sc < candidate.min);
+    if (lowPillars.length === 0){
+      return {stage:candidate, gatedBy:null, rationale:`All pillars meet ≥${candidate.min}.`};
+    }
+    let gatedStage = STAGES[0];
+    for (let i = STAGES.length-1; i >= 0; i--){
+      const s = STAGES[i];
+      const fails = Object.entries(pillarScores).filter(([p,sc]) => sc < s.min);
+      if (fails.length === 0){ gatedStage = s; break; }
+    }
+    lowPillars.sort((a,b)=>a[1]-b[1]);
+    const limiter = lowPillars[0];
+    return {
+      stage:gatedStage,
+      gatedBy:{pillar: limiter[0], score: limiter[1], needed: candidate.min},
+      rationale:`Gate constraint: ${limiter[0]} is ${limiter[1].toFixed(0)}/100 (<${candidate.min}).`
+    };
+  }
+
+  // ---- UI build ----
+  const pillarsDiv = document.getElementById("pillars");
+
+  function makeField(pillar, key, spec){
+    const id = `${pillar}__${key}`;
+    const field = document.createElement("div");
+    field.className = "field";
+
+    const label = document.createElement("label");
+    const left = document.createElement("span");
+    left.textContent = spec.label;
+    const right = document.createElement("span");
+    right.className = "pill";
+    right.textContent = spec.units || "";
+    label.appendChild(left);
+    label.appendChild(right);
+
+    const help = document.createElement("div");
+    help.className = "help";
+
+    let inputEl;
+    if (spec.input === "percent"){
+      inputEl = document.createElement("input");
+      inputEl.type="range"; inputEl.min=0; inputEl.max=100; inputEl.step=1;
+      inputEl.value = spec.default ?? 50;
+      help.textContent = "Percent (higher is better).";
+    } else if (spec.input === "band"){
+      inputEl = document.createElement("select");
+      for (const [opt,_] of spec.bands){
+        const o=document.createElement("option");
+        o.value=opt; o.textContent=opt;
+        inputEl.appendChild(o);
+      }
+      inputEl.value = spec.default ?? spec.bands[0][0];
+      help.textContent = "Banded performance (best at top).";
+    } else if (spec.input === "gap_band"){
+      inputEl = document.createElement("input");
+      inputEl.type="number"; inputEl.min=0; inputEl.max=50; inputEl.step=0.5;
+      inputEl.value = spec.default ?? 5;
+      help.textContent = "Absolute gap (pp). Lower is better (aim for 0).";
+    } else if (spec.input === "dollars"){
+      inputEl = document.createElement("input");
+      inputEl.type="number"; inputEl.min=0; inputEl.max=spec.cap ?? 1000000; inputEl.step=25000;
+      inputEl.value = spec.default ?? 0;
+      help.textContent = `Annual dollars. Scaled 0–100 (cap $${Number(spec.cap||0).toLocaleString()}).`;
+    } else if (spec.input === "likert"){
+      inputEl = document.createElement("select");
+      [1,2,3,4,5].forEach(v=>{
+        const o=document.createElement("option");
+        o.value=v; o.textContent=String(v);
+        inputEl.appendChild(o);
+      });
+      inputEl.value = spec.default ?? 3;
+      help.textContent = "Operational readiness (1=low, 5=high).";
+    } else {
+      inputEl = document.createElement("input");
+      inputEl.type="range"; inputEl.min=0; inputEl.max=100; inputEl.step=1;
+      inputEl.value = spec.default ?? 50;
+      help.textContent = "Percent (higher is better).";
+    }
+
+    inputEl.id = id;
+    inputEl.addEventListener("input", updateAll);
+    inputEl.addEventListener("change", updateAll);
+
+    const val = document.createElement("div");
+    val.className = "small";
+    val.style.marginTop = "6px";
+    val.id = id + "__val";
+
+    field.appendChild(label);
+    field.appendChild(inputEl);
+    field.appendChild(val);
+    field.appendChild(help);
+    return field;
+  }
+
+  function buildPillars(){
+    pillarsDiv.innerHTML = "";
+    for (const pillar of PILLAR_ORDER){
+      const d=document.createElement("details");
+      d.open = (pillar === "Access");
+      const s=document.createElement("summary");
+      s.innerHTML = `${pillar} <span class="small" id="score_${pillar}"></span>`;
+      d.appendChild(s);
+
+      const row=document.createElement("div");
+      row.className="row";
+      row.appendChild(makeField(pillar,"m1",METRICS[pillar].m1));
+      row.appendChild(makeField(pillar,"m2",METRICS[pillar].m2));
+      d.appendChild(row);
+
+      s.addEventListener("click", ()=>{
+        setTimeout(()=>{
+          document.getElementById("pillar_select").value = pillar;
+        }, 0);
+      });
+
+      pillarsDiv.appendChild(d);
+    }
+  }
+
+  function buildPillarSelect(){
+    const sel = document.getElementById("pillar_select");
+    sel.innerHTML = "";
+    for (const p of PILLAR_ORDER){
+      const o=document.createElement("option");
+      o.value=p; o.textContent=p;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", renderPillarView);
+  }
+
+  function getRaw(pillar, key, spec){
+    const el=document.getElementById(`${pillar}__${key}`);
+    if (!el) return spec.default;
+    if (spec.input === "band") return el.value;
+    return Number(el.value);
+  }
+  function scoreMetric(spec, raw){
+    if (spec.input === "percent") return scorePercent(raw);
+    if (spec.input === "band"){
+      const map=new Map(spec.bands);
+      return clamp(map.get(raw) ?? 0, 0, 100);
+    }
+    if (spec.input === "gap_band") return scoreGapAbs(raw, spec.bands);
+    if (spec.input === "dollars") return scoreDollars(raw, spec.cap ?? 1000000);
+    if (spec.input === "likert") return scoreLikert(raw, 1, 5);
+    return scorePercent(raw);
+  }
+
+  function compute(){
+    const pillarScores = {};
+    const metricScores = {};
+
+    for (const pillar of PILLAR_ORDER){
+      const w = METRICS[pillar].weights;
+      const m1 = METRICS[pillar].m1;
+      const m2 = METRICS[pillar].m2;
+
+      const m1_raw = getRaw(pillar, "m1", m1);
+      const m2_raw = getRaw(pillar, "m2", m2);
+
+      const m1_score = scoreMetric(m1, m1_raw);
+      const m2_score = scoreMetric(m2, m2_raw);
+
+      const pscore = clamp((w[0]*m1_score) + (w[1]*m2_score), 0, 100);
+      pillarScores[pillar] = pscore;
+
+      metricScores[pillar] = {
+        m1:{raw:m1_raw, score:m1_score, spec:m1, weight:w[0]},
+        m2:{raw:m2_raw, score:m2_score, spec:m2, weight:w[1]}
+      };
+
+      const val1=document.getElementById(`${pillar}__m1__val`);
+      const val2=document.getElementById(`${pillar}__m2__val`);
+      if (val1){
+        val1.textContent = (m1.input === "band")
+          ? `Selected: ${m1_raw} → score ${m1_score.toFixed(0)}/100`
+          : `Value: ${m1_raw} ${m1.units||""} → score ${m1_score.toFixed(0)}/100`;
+      }
+      if (val2){
+        val2.textContent = (m2.input === "band")
+          ? `Selected: ${m2_raw} → score ${m2_score.toFixed(0)}/100`
+          : `Value: ${m2_raw} ${m2.units||""} → score ${m2_score.toFixed(0)}/100`;
+      }
+      const sc=document.getElementById(`score_${pillar}`);
+      if (sc) sc.textContent = ` — ${pscore.toFixed(0)}/100`;
+    }
+
+    const lai = Object.values(pillarScores).reduce((a,b)=>a+b,0) / Math.max(1, PILLAR_ORDER.length);
+    return {lai, pillarScores, metricScores};
+  }
+
+  // ---- Charts ----
+  function renderGauge(divId, value, title){
+    const data = [{
+      type: "indicator",
+      mode: "gauge+number",
+      value: value,
+      title: { text: title, font: {size: 14} },
+      gauge: { axis: { range: [0, 100] } }
+    }];
+    const layout = { margin:{t:40,r:20,b:20,l:20}, height: 240 };
+    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+  }
+
+  function renderBar(divId, pillarScores){
+    const x = Object.keys(pillarScores);
+    const y = x.map(k=>pillarScores[k]);
+    const data=[{type:"bar", x:x, y:y}];
+    const layout={
+      margin:{t:30,r:10,b:100,l:40},
+      height: 320,
+      xaxis:{tickangle:-35},
+      yaxis:{range:[0,100], title:"Score (0–100)"}
+    };
+    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+  }
+
+  function renderPillarBreakdown(divId, pillar, metricScores){
+    const ms = metricScores[pillar];
+    const labels = ["KPI 1","KPI 2"];
+    const y = [ms.m1.score, ms.m2.score];
+    const text = [
+      `${ms.m1.spec.label}<br>Weight: ${ms.m1.weight}`,
+      `${ms.m2.spec.label}<br>Weight: ${ms.m2.weight}`
+    ];
+    const data=[{type:"bar", x:labels, y:y, text:text, hoverinfo:"text+y"}];
+    const layout={margin:{t:20,r:10,b:40,l:40}, height: 260, yaxis:{range:[0,100], title:"Score (0–100)"}};
+    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+  }
+
+  function renderHeatmap(divId, pillarScores){
+    const x = PILLAR_ORDER;
+    const z = [x.map(p=>pillarScores[p])];
+    const data=[{type:"heatmap", x:x, y:["Pillars"], z:z, zmin:0, zmax:100, showscale:true}];
+    const layout={margin:{t:10,r:10,b:90,l:50}, height: 220};
+    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+  }
+
+  // ---- Text / KPIs ----
+  function setText(id, txt){ const el=document.getElementById(id); if (el) el.textContent = txt; }
+  function setClass(id, cls){
+    const el=document.getElementById(id);
+    if (!el) return;
+    el.classList.remove("good","warn","bad");
+    if (cls) el.classList.add(cls);
+  }
+
+  function topOpportunities(pillarScores, n=3){
+    const arr = Object.entries(pillarScores).sort((a,b)=>a[1]-b[1]);
+    return arr.slice(0,n);
+  }
+
+  // ---- KPI reference table ----
+  function buildKpiTable(){
+    const tbl = document.getElementById("kpi_table");
+    let html = "<tr><th>Pillar</th><th>KPI</th><th>Input type</th><th>Weight</th><th>Default</th></tr>";
+    for (const p of PILLAR_ORDER){
+      html += `<tr>
+        <td rowspan="2"><b>${p}</b></td>
+        <td>${METRICS[p].m1.label}</td>
+        <td>${METRICS[p].m1.input}</td>
+        <td>${METRICS[p].weights[0]}</td>
+        <td>${METRICS[p].m1.default}</td>
+      </tr>`;
+      html += `<tr>
+        <td>${METRICS[p].m2.label}</td>
+        <td>${METRICS[p].m2.input}</td>
+        <td>${METRICS[p].weights[1]}</td>
+        <td>${METRICS[p].m2.default}</td>
+      </tr>`;
+    }
+    tbl.innerHTML = html;
+  }
+
+  // ---- View switching ----
+  function setActiveView(view){
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    document.getElementById("view_"+view).classList.add("active");
+    document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
+    document.getElementById("tab_"+view).classList.add("active");
+
+    // Render appropriate charts (Plotly needs visible container for sizing)
+    if (view === "pillar") renderPillarView();
+    if (view === "pulse") renderPulseView();
+    if (view === "overview") updateAll();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  // ---- Pillar view render ----
+  function renderPillarView(){
+    const {lai, pillarScores, metricScores} = compute();
+    const p = document.getElementById("pillar_select").value || PILLAR_ORDER[0];
+
+    // left fields
+    const wrap = document.getElementById("pillar_fields");
+    wrap.innerHTML = "";
+    wrap.appendChild(makeField(p,"m1",METRICS[p].m1));
+    wrap.appendChild(makeField(p,"m2",METRICS[p].m2));
+
+    // sync values from overview controls (so edits carry over)
+    ["m1","m2"].forEach(k=>{
+      const src = document.getElementById(`${p}__${k}`);
+      const dst = document.getElementById(`${p}__${k}`); // new element has same id, already
+      // nothing needed: id collision ensures a single element in DOM; we rebuilt fields, so copy from stored values
+    });
+
+    const score = pillarScores[p];
+    setText("pillar_score_value", score.toFixed(0));
+    const [rb, rsk, cls] = readinessBand(score);
+    setText("pillar_score_band", rb);
+    setClass("pillar_score_badge", cls);
+    setText("pillar_score_badge", `${p}: ${score.toFixed(0)}/100`);
+
+    // nearest gate
+    let next = STAGES.find(s=>score < s.min && s.min>0);
+    if (!next) next = STAGES[STAGES.length-1];
+    setText("pillar_gate", `≥${next.min}`);
+
+    // prompts
+    const prompts = [
+      `What is the single workflow failure mode most likely to explain the low KPI score(s) in ${p}?`,
+      `Which unit/service line is the outlier—and what control would reduce variance within 30–60 days?`,
+      `What “documentation fidelity” standard would make this pillar audit-defensible (policy, EHR, training)?`,
+      `What would it take to consistently hit the next gate (≥${next.min}) across all sites?`
+    ];
+    setText("exec_prompts", prompts.join(" "));
+
+    // charts
+    renderGauge("pillar_gauge", score, `${p} — Pillar Score`);
+    renderPillarBreakdown("pillar_breakdown", p, metricScores);
+  }
+
+  function renderPulseView(){
+    const {lai, pillarScores} = compute();
+    const [rb, rsk, cls] = readinessBand(lai);
+    const st = stageFrom(lai, pillarScores);
+
+    setText("lai_value_2", lai.toFixed(0));
+    setText("lai_band_2", rb);
+    setText("risk_label_2", rsk);
+    setText("stage_label_2", `${st.stage.name}: ${st.stage.label}`);
+    setText("stage_desc_2", st.stage.desc);
+    setText("stage_rationale", st.rationale);
+
+    renderGauge("gauge_pulse", lai, "LAI Pulse");
+    renderHeatmap("heatmap_pulse", pillarScores);
+  }
+
+  // ---- Overview update ----
+  function updateAll(){
+    const {lai, pillarScores, metricScores} = compute();
+    const [rb, rsk, cls] = readinessBand(lai);
+    const st = stageFrom(lai, pillarScores);
+    const opp = topOpportunities(pillarScores, 3).map(([p,s])=>`${p} (${s.toFixed(0)})`).join(" • ");
+
+    setText("lai_value", lai.toFixed(0));
+    setText("lai_band", rb);
+    setText("risk_label", rsk);
+    setText("stage_label", `${st.stage.name}: ${st.stage.label}`);
+    setText("stage_desc", st.stage.desc);
+    setText("opp_list", opp || "—");
+
+    renderGauge("gauge_overview", lai, "LAI Pulse");
+    renderBar("bar_overview", pillarScores);
+
+    // keep pillar view updated if visible
+    if (document.getElementById("view_pillar").classList.contains("active")) renderPillarView();
+    if (document.getElementById("view_pulse").classList.contains("active")) renderPulseView();
+  }
+
+  // ---- Reset / Expand / Collapse ----
+  function resetDefaults(){
+    for (const p of PILLAR_ORDER){
+      for (const k of ["m1","m2"]){
+        const spec = METRICS[p][k];
+        const el = document.getElementById(`${p}__${k}`);
+        if (!el) continue;
+        if (spec.input === "band") el.value = spec.default;
+        else el.value = spec.default;
+      }
+    }
+    updateAll();
+  }
+  function expandAll(){
+    document.querySelectorAll("#pillars details").forEach(d=>d.open=true);
+  }
+  function collapseAll(){
+    document.querySelectorAll("#pillars details").forEach(d=>d.open=false);
+  }
+
+  // ---- Exports ----
+  function downloadText(filename, text, mime="text/plain"){
+    const blob = new Blob([text], {type:mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportInputsJSON(){
+    const inputs = {};
+    for (const p of PILLAR_ORDER){
+      inputs[p] = {};
+      for (const k of ["m1","m2"]){
+        const spec = METRICS[p][k];
+        inputs[p][k] = getRaw(p,k,spec);
+      }
+    }
+    downloadText("lai_inputs.json", JSON.stringify(inputs, null, 2), "application/json");
+  }
+
+  function exportScoresCSV(){
+    const {lai, pillarScores} = compute();
+    let rows = [["Metric","Score"]];
+    rows.push(["LAI", lai.toFixed(2)]);
+    for (const p of PILLAR_ORDER){
+      rows.push([p, pillarScores[p].toFixed(2)]);
+    }
+    const csv = rows.map(r=>r.map(v=>String(v).replaceAll('"','""')).map(v=>`"${v}"`).join(",")).join("\n");
+    downloadText("lai_scores.csv", csv, "text/csv");
+  }
+
+  // ---- Tab wiring ----
+  document.querySelectorAll(".tabbtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> setActiveView(btn.dataset.view));
+  });
+  document.getElementById("jump_to_pillar").addEventListener("click", ()=> setActiveView("pillar"));
+
+  document.getElementById("btn_reset").addEventListener("click", resetDefaults);
+  document.getElementById("btn_expand").addEventListener("click", expandAll);
+  document.getElementById("btn_collapse").addEventListener("click", collapseAll);
+  document.getElementById("btn_export_json").addEventListener("click", exportInputsJSON);
+  document.getElementById("btn_export_csv").addEventListener("click", exportScoresCSV);
+
+  document.getElementById("btn_back_overview_1").addEventListener("click", ()=> setActiveView("overview"));
+  document.getElementById("btn_go_pulse_1").addEventListener("click", ()=> setActiveView("pulse"));
+  document.getElementById("btn_back_overview_2").addEventListener("click", ()=> setActiveView("overview"));
+  document.getElementById("btn_go_pillar_2").addEventListener("click", ()=> setActiveView("pillar"));
+
+  // ---- Init ----
+  buildPillars();
+  buildPillarSelect();
+  buildKpiTable();
+  resetDefaults();
+  updateAll();
+</script>
 </body>
 </html>
