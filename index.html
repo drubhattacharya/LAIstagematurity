@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>LAI Dashboard — 3 Tiers (Overview • Pillar • Pulse • Upload)</title>
+  <title>LAI Dashboard — 3 Tiers (Overview • Pillar • Pulse • Auto-Compute)</title>
 
   <!-- Plotly for charts -->
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
@@ -86,7 +86,6 @@
     th,td{border:1px solid var(--border); padding:8px; vertical-align:top;}
     th{background:rgba(31,127,214,.08); text-align:left;}
     .callout{border:1px dashed rgba(11,31,51,.25); border-radius:14px; padding:10px 12px; background: rgba(255,255,255,.7);}
-    .mutedlink{color: var(--muted); text-decoration: underline; cursor: pointer; font-weight: 900;}
     .errbar{display:none; border:1px solid rgba(217,59,59,.35); background:rgba(217,59,59,.08); color:var(--ink);
       border-radius:14px; padding:10px 12px; margin-top:12px;}
     .okbar{display:none; border:1px solid rgba(24,167,111,.35); background:rgba(24,167,111,.08); color:var(--ink);
@@ -107,7 +106,7 @@
 <header>
   <div class="wrap" style="padding:0 18px;">
     <h1>Language Access Index (LAI) — 3-Tier Navigation Dashboard</h1>
-    <div class="sub">Tier 1: Overview • Tier 2: Pillar Deep Dive • Tier 3: LAI Pulse with Excel Upload</div>
+    <div class="sub">Tier 1: Preparedness proxy • Tier 2: Pillar drilldown • Tier 3: Performance validated from encounter-level evidence (optional Advanced Case Mode)</div>
     <div class="tabs" aria-label="Navigation tabs">
       <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Overview</button>
       <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Pillar Deep Dive</button>
@@ -133,7 +132,7 @@
           <span class="chip" id="mode_chip">Mode: Manual (Tier 1)</span>
         </div>
         <div class="small">
-          Adjust inputs below. Scores update instantly. Tier 3 can optionally override these inputs via an uploaded Excel.
+          Tier 1 is a simplified preparedness proxy. Tier 3 can override Tier 1 using an encounter-level dataset (more precise).
         </div>
         <div id="pillars"></div>
       </div>
@@ -165,7 +164,7 @@
         <div style="margin-top:10px;" id="bar_overview"></div>
 
         <details>
-          <summary>Pillar KPI reference (inputs + weights)</summary>
+          <summary>Pillar KPI reference (Tier 1 proxy inputs)</summary>
           <div style="margin-top:10px;">
             <table id="kpi_table"></table>
           </div>
@@ -192,7 +191,7 @@
               <span class="pill" id="pillar_score_badge">—</span>
             </div>
             <div class="small" style="margin-top:6px;">
-              This view isolates one pillar, shows its two KPI scores, and highlights “what to move next.”
+              Tier 2 interprets signals from Tier 1 or Tier 3 (whichever is active) but does not change the underlying computation.
             </div>
 
             <div class="row" id="pillar_fields" style="margin-top:10px;"></div>
@@ -236,11 +235,13 @@
 
         <!-- Upload card -->
         <div class="card" style="box-shadow:none; margin-bottom:12px;">
-          <div style="font-weight:900; margin-bottom:6px;">Upload Aggregated LAI Metrics (Excel)</div>
+          <div style="font-weight:900; margin-bottom:6px;">Tier 3 Data Evidence Upload</div>
           <div class="small" style="margin-bottom:10px;">
-            Upload an <b>.xlsx</b> (or <b>.csv</b>) containing a sheet named <code>LAI_Pillar_Metrics</code> with columns:
-            <code>pillar_name</code>, <code>metric_1_value</code>, <code>metric_2_value</code> (optional: <code>denominator</code>, <code>reporting_period</code>).
-            When active, the upload becomes the source of truth for Tier 3 (and locks Tier 1 controls).
+            Upload an <b>.xlsx</b> (or <b>.csv</b>). Supported paths:
+            <ul style="margin:6px 0 0 18px; padding:0;">
+              <li><b>Encounter-level auto-compute (recommended):</b> sheet <code>Encounter_Level_Data</code> (computes all pillar KPIs from documented tasks and CPT signals).</li>
+              <li><b>Pre-aggregated upload:</b> sheet <code>LAI_Pillar_Metrics</code> with <code>pillar_name</code>, <code>metric_1_value</code>, <code>metric_2_value</code>.</li>
+            </ul>
           </div>
 
           <div class="inline">
@@ -248,15 +249,18 @@
             <button id="btn_download_template">Download template</button>
             <button class="danger" id="btn_clear_upload" disabled>Clear upload</button>
 
-            <span class="chip">
-              <input type="checkbox" id="chk_values_scored" />
-              <label for="chk_values_scored">Uploaded values are already 0–100 scores</label>
+            <span class="chip" title="D2 weighting makes advanced maternal health encounters count more heavily in selected pillars.">
+              <input type="checkbox" id="chk_advanced_mode" />
+              <label for="chk_advanced_mode">Advanced Case Mode (D2)</label>
             </span>
           </div>
 
           <div class="small" style="margin-top:10px;">
             <b>Status:</b> <span id="upload_status">No file loaded.</span>
             <span id="upload_meta"></span>
+          </div>
+          <div class="small" style="margin-top:6px;">
+            <b>Computation:</b> <span id="compute_mode">Tier 1 proxy</span>
           </div>
         </div>
 
@@ -298,13 +302,12 @@
         </div>
 
         <details>
-          <summary>Scoring assumptions (transparent)</summary>
+          <summary>Tier 3 computation notes (why it differs from Tier 1)</summary>
           <div class="small" style="margin-top:8px;">
             <ul style="margin:0; padding-left:18px;">
-              <li>LAI = average of the 10 pillar scores.</li>
-              <li>Each pillar = weighted average of two KPIs (weights shown in Tier 1 reference table).</li>
-              <li>Stage maturity uses LAI thresholds plus a “weakest-link gate.”</li>
-              <li>If “Uploaded values are already 0–100 scores” is checked, the file’s metric values are treated as scores (not re-scored).</li>
+              <li><b>Tier 1</b> uses simplified proxy inputs to estimate preparedness.</li>
+              <li><b>Tier 3</b> computes pillar KPIs from documented tasks and evidence fields (e.g., E/M defensibility, MDM elements, touchpoint coverage completeness, CCM/TCM completeness, timestamp integrity, rework proxy).</li>
+              <li><b>Advanced Case Mode (D2)</b> increases the weight of advanced maternal health encounters for selected pillars (risk-constrained maturity).</li>
             </ul>
           </div>
         </details>
@@ -316,89 +319,88 @@
 <script>
   // ---- Helpers ----
   function slugify(s){
-    return String(s).toLowerCase()
-      .replace(/&/g,"and")
-      .replace(/[^a-z0-9]+/g,"_")
-      .replace(/^_+|_+$/g,"");
+    return String(s).toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
   }
   function clamp(x, lo=0, hi=100){ return Math.max(lo, Math.min(hi, x)); }
-  function scorePercent(p){ return clamp(Number(p)||0,0,100); }
-  function scoreGapAbs(g, bands){
-    const a = Math.abs(Number(g)||0);
-    for (const [u,s] of bands){ if (a <= u) return clamp(s,0,100); }
-    return clamp(bands[bands.length-1][1],0,100);
+
+  function normKey(k){ return String(k||"").trim().toLowerCase(); }
+  function yn(v){
+    // normalize Yes/No variants
+    const s = String(v ?? "").trim().toLowerCase();
+    if (s === "yes" || s === "y" || s === "true" || s === "1") return 1;
+    if (s === "no" || s === "n" || s === "false" || s === "0") return 0;
+    return null; // missing/unknown
   }
-  function scoreDollars(v, cap){
-    v = Math.max(0, Number(v)||0);
-    cap = Math.max(1, Number(cap)||1);
-    return clamp((Math.log1p(v)/Math.log1p(cap))*100,0,100);
+  function num(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
   }
-  function scoreLikert(v, min=1, max=5){
-    v = Number(v)||min;
-    return clamp(((v-min)/Math.max(1,(max-min)))*100,0,100);
+  function isMissing(v){
+    return v === null || v === undefined || (typeof v === "string" && v.trim()==="");
   }
-  function readinessBand(lai){
-    if (lai >= 80) return ["High readiness","Lower risk","good"];
-    if (lai >= 60) return ["Moderate readiness","Moderate risk","warn"];
-    return ["Low readiness","Higher risk","bad"];
+
+  function weightedMean(values, weights){
+    let sw=0, sx=0;
+    for (let i=0;i<values.length;i++){
+      const w = weights[i];
+      const x = values[i];
+      if (x === null || x === undefined) continue;
+      if (!Number.isFinite(w) || w<=0) continue;
+      sw += w; sx += w*x;
+    }
+    return sw>0 ? sx/sw : null;
   }
+  function weightedRate(indicators, weights){
+    // indicators: 0/1 values, possibly null
+    const m = weightedMean(indicators, weights);
+    return m===null ? null : 100*m;
+  }
+  function weightedMedian(values, weights){
+    // values numeric, weights positive
+    const pairs = [];
+    for (let i=0;i<values.length;i++){
+      const v = values[i];
+      const w = weights[i];
+      if (v===null || v===undefined) continue;
+      if (!Number.isFinite(v) || !Number.isFinite(w) || w<=0) continue;
+      pairs.push([v,w]);
+    }
+    if (!pairs.length) return null;
+    pairs.sort((a,b)=>a[0]-b[0]);
+    const totalW = pairs.reduce((a,b)=>a+b[1],0);
+    let cum=0;
+    for (const [v,w] of pairs){
+      cum += w;
+      if (cum >= totalW/2) return v;
+    }
+    return pairs[pairs.length-1][0];
+  }
+
+  function delayScoreFromMedian(mins){
+    if (mins===null || mins===undefined) return 0;
+    if (mins <= 10) return 100;
+    if (mins <= 15) return 80;
+    if (mins <= 20) return 60;
+    if (mins <= 25) return 40;
+    return 20;
+  }
+
   function setText(id, txt){ const el=document.getElementById(id); if (el) el.textContent = txt; }
   function setHTML(id, html){ const el=document.getElementById(id); if (el) el.innerHTML = html; }
-  function setClass(id, cls){
-    const el=document.getElementById(id);
-    if (!el) return;
-    el.classList.remove("good","warn","bad");
-    if (cls) el.classList.add(cls);
-  }
-  function showErr(msg){
-    const e=document.getElementById("errbar");
-    e.style.display="block";
-    e.innerHTML = msg;
-  }
-  function clearErr(){
-    const e=document.getElementById("errbar");
-    e.style.display="none";
-    e.innerHTML = "";
-  }
-  function showOk(msg){
-    const o=document.getElementById("okbar");
-    o.style.display="block";
-    o.innerHTML = msg;
-  }
+  function showErr(msg){ const e=document.getElementById("errbar"); e.style.display="block"; e.innerHTML = msg; }
+  function clearErr(){ const e=document.getElementById("errbar"); e.style.display="none"; e.innerHTML = ""; }
+  function showOk(msg){ const o=document.getElementById("okbar"); o.style.display="block"; o.innerHTML = msg; }
 
-  // ---- LAI metric schema (2 KPIs per pillar) ----
+  // ---- Tier 1 proxy schema (kept for continuity) ----
   const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
 
+  // Pillars shown in dashboard
   const PILLAR_ORDER = ["Access","Patient Experience","Outcomes","Compliance","Patient Engagement","Financial Stewardship","Quality and Safety","Workforce Development","Workflow Optimization","Technology Innovation"];
-  const PILLAR_IDS = Object.fromEntries(PILLAR_ORDER.map(p=>[p, slugify(p)]));
+  // Map to internal IDs and to the dataset naming (Quality & Safety differs)
+  const PILLAR_DISPLAY_TO_ID = Object.fromEntries(PILLAR_ORDER.map(p=>[p, slugify(p)]));
+  const PILLAR_ID_TO_DISPLAY = Object.fromEntries(PILLAR_ORDER.map(p=>[slugify(p), p]));
 
-  // ---- Upload state ----
-  let MODE = "manual"; // manual | upload
-  // uploadedRaw[pillar] = {m1: value, m2: value, denominator?, reporting_period?}
-  let uploadedRaw = null;
-  let uploadedMeta = {fileName:null, reporting_period:null, denominator_sum:null};
-
-  function setMode(mode){
-    MODE = mode;
-    const label = (MODE === "upload") ? "Mode: Excel Upload (Tier 3)" : "Mode: Manual (Tier 1)";
-    ["mode_chip","mode_chip_2","mode_chip_3"].forEach(id=> setText(id, label));
-    setManualEnabled(MODE !== "upload");
-  }
-
-  function setManualEnabled(enabled){
-    // Enable/disable Tier 1 inputs (sliders/selects/number fields)
-    for (const p of PILLAR_ORDER){
-      for (const k of ["m1","m2"]){
-        const el = document.getElementById(idFor(p,k));
-        if (el) el.disabled = !enabled;
-      }
-    }
-    // Disable reset if upload mode (to avoid confusion)
-    const r = document.getElementById("btn_reset");
-    if (r) r.disabled = !enabled;
-  }
-
-  // ---- Stage maturity model (LAI threshold + weakest-link gate) ----
+  // Stage model (unchanged)
   const STAGES = [
     {name:"Stage 0", min:0,  label:"Unstable",          desc:"Reactive, inconsistent infrastructure; high variance by unit/service line."},
     {name:"Stage 1", min:40, label:"Foundational",      desc:"Core capabilities exist, but performance is uneven; basic standardization underway."},
@@ -428,28 +430,51 @@
     };
   }
 
-  // ---- UI build ----
-  const pillarsDiv = document.getElementById("pillars");
-  function idFor(pillar, key){ return `${PILLAR_IDS[pillar]}__${key}`; }
+  function readinessBand(lai){
+    if (lai >= 80) return ["High readiness","Lower risk","good"];
+    if (lai >= 60) return ["Moderate readiness","Moderate risk","warn"];
+    return ["Low readiness","Higher risk","bad"];
+  }
 
+  // ---- Mode state ----
+  let MODE = "manual";          // manual | upload
+  let COMPUTE = "tier1_proxy";  // tier1_proxy | encounter_auto | pillar_agg
+  let uploadedRaw = null;       // {pillar: {m1, m2}} where m1/m2 are raw inputs or scores depending on COMPUTE
+  let uploadedMeta = {};
+
+  function setMode(mode, computeModeLabel){
+    MODE = mode;
+    const label = (MODE === "upload") ? "Mode: Tier 3 Evidence" : "Mode: Manual (Tier 1)";
+    ["mode_chip","mode_chip_2","mode_chip_3"].forEach(id=> setText(id, label));
+    setText("compute_mode", computeModeLabel || (MODE==="upload" ? "Tier 3 evidence" : "Tier 1 proxy"));
+    setManualEnabled(MODE !== "upload");
+  }
+  function setManualEnabled(enabled){
+    for (const p of PILLAR_ORDER){
+      for (const k of ["m1","m2"]){
+        const el = document.getElementById(`${PILLAR_DISPLAY_TO_ID[p]}__${k}`);
+        if (el) el.disabled = !enabled;
+      }
+    }
+    const r = document.getElementById("btn_reset");
+    if (r) r.disabled = !enabled;
+  }
+
+  // ---- Tier 1 UI build ----
+  const pillarsDiv = document.getElementById("pillars");
   function makeField(pillar, key, spec){
-    const id = idFor(pillar, key);
+    const id = `${PILLAR_DISPLAY_TO_ID[pillar]}__${key}`;
     const field = document.createElement("div");
     field.className = "field";
 
     const label = document.createElement("label");
-    const left = document.createElement("span");
-    left.textContent = spec.label;
-    const right = document.createElement("span");
-    right.className = "pill";
-    right.textContent = spec.units || "";
-    label.appendChild(left);
-    label.appendChild(right);
+    const left = document.createElement("span"); left.textContent = spec.label;
+    const right = document.createElement("span"); right.className="pill"; right.textContent = spec.units || "";
+    label.appendChild(left); label.appendChild(right);
 
-    const help = document.createElement("div");
-    help.className = "help";
-
+    const help = document.createElement("div"); help.className="help";
     let inputEl;
+
     if (spec.input === "percent"){
       inputEl = document.createElement("input");
       inputEl.type="range"; inputEl.min=0; inputEl.max=100; inputEl.step=1;
@@ -458,9 +483,7 @@
     } else if (spec.input === "band"){
       inputEl = document.createElement("select");
       for (const [opt,_] of spec.bands){
-        const o=document.createElement("option");
-        o.value=opt; o.textContent=opt;
-        inputEl.appendChild(o);
+        const o=document.createElement("option"); o.value=opt; o.textContent=opt; inputEl.appendChild(o);
       }
       inputEl.value = spec.default ?? spec.bands[0][0];
       help.textContent = "Banded performance (best at top).";
@@ -476,11 +499,7 @@
       help.textContent = `Annual dollars. Scaled 0–100 (cap $${Number(spec.cap||0).toLocaleString()}).`;
     } else if (spec.input === "likert"){
       inputEl = document.createElement("select");
-      [1,2,3,4,5].forEach(v=>{
-        const o=document.createElement("option");
-        o.value=v; o.textContent=String(v);
-        inputEl.appendChild(o);
-      });
+      [1,2,3,4,5].forEach(v=>{ const o=document.createElement("option"); o.value=v; o.textContent=String(v); inputEl.appendChild(o); });
       inputEl.value = spec.default ?? 3;
       help.textContent = "Operational readiness (1=low, 5=high).";
     } else {
@@ -495,9 +514,7 @@
     inputEl.addEventListener("change", updateAll);
 
     const val = document.createElement("div");
-    val.className = "small";
-    val.style.marginTop = "6px";
-    val.id = id + "__val";
+    val.className="small"; val.style.marginTop="6px"; val.id = id + "__val";
 
     field.appendChild(label);
     field.appendChild(inputEl);
@@ -512,58 +529,64 @@
       const d=document.createElement("details");
       d.open = (pillar === "Access");
       const s=document.createElement("summary");
-      s.innerHTML = `${pillar} <span class="small" id="score_${PILLAR_IDS[pillar]}"></span>`;
+      s.innerHTML = `${pillar} <span class="small" id="score_${PILLAR_DISPLAY_TO_ID[pillar]}"></span>`;
       d.appendChild(s);
 
-      const row=document.createElement("div");
-      row.className="row";
+      const row=document.createElement("div"); row.className="row";
       row.appendChild(makeField(pillar,"m1",METRICS[pillar].m1));
       row.appendChild(makeField(pillar,"m2",METRICS[pillar].m2));
       d.appendChild(row);
-
       pillarsDiv.appendChild(d);
     }
   }
 
   function buildPillarSelect(){
-    const sel = document.getElementById("pillar_select");
-    sel.innerHTML = "";
+    const sel=document.getElementById("pillar_select");
+    sel.innerHTML="";
     for (const p of PILLAR_ORDER){
-      const o=document.createElement("option");
-      o.value=p; o.textContent=p;
-      sel.appendChild(o);
+      const o=document.createElement("option"); o.value=p; o.textContent=p; sel.appendChild(o);
     }
     sel.addEventListener("change", renderPillarView);
   }
 
-  function getRawManual(pillar, key, spec){
-    const el=document.getElementById(idFor(pillar, key));
+  // ---- Compute for Tier 1 or Tier 3 ----
+  function getRaw(pillar, key, spec){
+    // Tier 3 upload overrides
+    if (MODE === "upload" && uploadedRaw && uploadedRaw[pillar] && uploadedRaw[pillar][key] != null){
+      return uploadedRaw[pillar][key];
+    }
+    // Tier 1 controls
+    const el=document.getElementById(`${PILLAR_DISPLAY_TO_ID[pillar]}__${key}`);
     if (!el) return spec.default;
     if (spec.input === "band") return el.value;
     return Number(el.value);
   }
 
-  function getRaw(pillar, key, spec){
-    if (MODE === "upload" && uploadedRaw && uploadedRaw[pillar] && uploadedRaw[pillar][key] != null){
-      return uploadedRaw[pillar][key];
-    }
-    return getRawManual(pillar, key, spec);
-  }
-
+  // Tier 3 upload always provides scores in v4; Tier 1 uses spec scoring.
   function scoreMetric(spec, raw){
-    if (document.getElementById("chk_values_scored")?.checked && MODE === "upload"){
-      // treat raw as already-scored 0–100
+    if (MODE === "upload"){
       return clamp(Number(raw)||0, 0, 100);
     }
-    if (spec.input === "percent") return scorePercent(raw);
+    if (spec.input === "percent") return clamp(Number(raw)||0,0,100);
     if (spec.input === "band"){
       const map=new Map(spec.bands);
       return clamp(map.get(raw) ?? 0, 0, 100);
     }
-    if (spec.input === "gap_band") return scoreGapAbs(raw, spec.bands);
-    if (spec.input === "dollars") return scoreDollars(raw, spec.cap ?? 1000000);
-    if (spec.input === "likert") return scoreLikert(raw, 1, 5);
-    return scorePercent(raw);
+    if (spec.input === "gap_band"){
+      const a=Math.abs(Number(raw)||0);
+      for (const [u,s] of spec.bands){ if (a <= u) return clamp(s,0,100); }
+      return clamp(spec.bands[spec.bands.length-1][1],0,100);
+    }
+    if (spec.input === "dollars"){
+      const v=Math.max(0,Number(raw)||0);
+      const cap=Math.max(1,Number(spec.cap||1));
+      return clamp((Math.log1p(v)/Math.log1p(cap))*100,0,100);
+    }
+    if (spec.input === "likert"){
+      const v=Number(raw)||1;
+      return clamp(((v-1)/4)*100,0,100);
+    }
+    return clamp(Number(raw)||0,0,100);
   }
 
   function compute(){
@@ -589,20 +612,13 @@
         m2:{raw:m2_raw, score:m2_score, spec:m2, weight:w[1]}
       };
 
-      // Update Tier 1 value text (still helpful even when disabled)
-      const val1=document.getElementById(idFor(pillar,"m1")+"__val");
-      const val2=document.getElementById(idFor(pillar,"m2")+"__val");
-      if (val1){
-        val1.textContent = (m1.input === "band")
-          ? `Selected: ${m1_raw} → score ${m1_score.toFixed(0)}/100`
-          : `Value: ${m1_raw} ${m1.units||""} → score ${m1_score.toFixed(0)}/100`;
-      }
-      if (val2){
-        val2.textContent = (m2.input === "band")
-          ? `Selected: ${m2_raw} → score ${m2_score.toFixed(0)}/100`
-          : `Value: ${m2_raw} ${m2.units||""} → score ${m2_score.toFixed(0)}/100`;
-      }
-      const sc=document.getElementById("score_"+PILLAR_IDS[pillar]);
+      // Update Tier 1 readouts (works even when disabled)
+      const val1=document.getElementById(`${PILLAR_DISPLAY_TO_ID[pillar]}__m1__val`);
+      const val2=document.getElementById(`${PILLAR_DISPLAY_TO_ID[pillar]}__m2__val`);
+      if (val1) val1.textContent = `Score: ${m1_score.toFixed(0)}/100`;
+      if (val2) val2.textContent = `Score: ${m2_score.toFixed(0)}/100`;
+
+      const sc=document.getElementById(`score_${PILLAR_DISPLAY_TO_ID[pillar]}`);
       if (sc) sc.textContent = ` — ${pscore.toFixed(0)}/100`;
     }
 
@@ -610,97 +626,55 @@
     return {lai, pillarScores, metricScores};
   }
 
-  // ---- Charts (graceful if Plotly fails) ----
+  // ---- Charts ----
   function canPlotly(){ return (typeof Plotly !== "undefined" && Plotly && Plotly.newPlot); }
-
   function renderGauge(divId, value, title){
     const el = document.getElementById(divId);
     if (!el) return;
     if (!canPlotly()){
-      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load). Value: <b>${value.toFixed(0)}</b></div>`;
+      el.innerHTML = `<div class="small">Chart unavailable. Value: <b>${value.toFixed(0)}</b></div>`;
       return;
     }
-    const data = [{
-      type: "indicator", mode: "gauge+number", value: value,
-      title: { text: title, font: {size: 14} },
-      gauge: { axis: { range: [0, 100] } }
-    }];
-    const layout = { margin:{t:40,r:20,b:20,l:20}, height: 240 };
-    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+    const data=[{type:"indicator", mode:"gauge+number", value:value, title:{text:title,font:{size:14}}, gauge:{axis:{range:[0,100]}}}];
+    const layout={margin:{t:40,r:20,b:20,l:20}, height:240};
+    Plotly.newPlot(divId,data,layout,{displayModeBar:false,responsive:true});
   }
-
   function renderBar(divId, pillarScores){
-    const el = document.getElementById(divId);
-    if (!el) return;
-    if (!canPlotly()){
-      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load).</div>`;
-      return;
-    }
-    const x = Object.keys(pillarScores);
-    const y = x.map(k=>pillarScores[k]);
+    const el=document.getElementById(divId); if (!el) return;
+    if (!canPlotly()){ el.innerHTML=`<div class="small">Chart unavailable.</div>`; return; }
+    const x=Object.keys(pillarScores);
+    const y=x.map(k=>pillarScores[k]);
     const data=[{type:"bar", x:x, y:y}];
-    const layout={
-      margin:{t:30,r:10,b:110,l:40},
-      height: 320,
-      xaxis:{tickangle:-35},
-      yaxis:{range:[0,100], title:"Score (0–100)"}
-    };
-    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+    const layout={margin:{t:30,r:10,b:110,l:40}, height:320, xaxis:{tickangle:-35}, yaxis:{range:[0,100], title:"Score (0–100)"}};
+    Plotly.newPlot(divId,data,layout,{displayModeBar:false,responsive:true});
   }
-
   function renderPillarBreakdown(divId, pillar, metricScores){
-    const el = document.getElementById(divId);
-    if (!el) return;
-    if (!canPlotly()){
-      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load).</div>`;
-      return;
-    }
-    const ms = metricScores[pillar];
-    const labels = ["KPI 1","KPI 2"];
-    const y = [ms.m1.score, ms.m2.score];
-    const text = [
-      `${ms.m1.spec.label}<br>Weight: ${ms.m1.weight}`,
-      `${ms.m2.spec.label}<br>Weight: ${ms.m2.weight}`
-    ];
-    const data=[{type:"bar", x:labels, y:y, text:text, hoverinfo:"text+y"}];
-    const layout={margin:{t:20,r:10,b:40,l:40}, height: 260, yaxis:{range:[0,100], title:"Score (0–100)"}};
-    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+    const el=document.getElementById(divId); if (!el) return;
+    if (!canPlotly()){ el.innerHTML=`<div class="small">Chart unavailable.</div>`; return; }
+    const ms=metricScores[pillar];
+    const data=[{type:"bar", x:["KPI 1","KPI 2"], y:[ms.m1.score, ms.m2.score], hoverinfo:"y"}];
+    const layout={margin:{t:20,r:10,b:40,l:40}, height:260, yaxis:{range:[0,100], title:"Score (0–100)"}};
+    Plotly.newPlot(divId,data,layout,{displayModeBar:false,responsive:true});
   }
-
   function renderHeatmap(divId, pillarScores){
-    const el = document.getElementById(divId);
-    if (!el) return;
-    if (!canPlotly()){
-      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load).</div>`;
-      return;
-    }
-    const x = PILLAR_ORDER;
-    const z = [x.map(p=>pillarScores[p])];
+    const el=document.getElementById(divId); if (!el) return;
+    if (!canPlotly()){ el.innerHTML=`<div class="small">Chart unavailable.</div>`; return; }
+    const x=PILLAR_ORDER;
+    const z=[x.map(p=>pillarScores[p])];
     const data=[{type:"heatmap", x:x, y:["Pillars"], z:z, zmin:0, zmax:100, showscale:true}];
-    const layout={margin:{t:10,r:10,b:90,l:50}, height: 220};
-    Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
+    const layout={margin:{t:10,r:10,b:90,l:50}, height:220};
+    Plotly.newPlot(divId,data,layout,{displayModeBar:false,responsive:true});
   }
 
-  // ---- Reference table ----
+  // ---- KPI reference table (Tier 1 only) ----
   function buildKpiTable(){
-    const tbl = document.getElementById("kpi_table");
-    let html = "<tr><th>Pillar</th><th>KPI</th><th>Input type</th><th>Weight</th><th>Default</th></tr>";
+    const tbl=document.getElementById("kpi_table");
+    let html="<tr><th>Pillar</th><th>KPI</th><th>Input type</th><th>Weight</th><th>Default</th></tr>";
     for (const p of PILLAR_ORDER){
-      html += `<tr>
-        <td rowspan="2"><b>${p}</b></td>
-        <td>${METRICS[p].m1.label}</td>
-        <td>${METRICS[p].m1.input}</td>
-        <td>${METRICS[p].weights[0]}</td>
-        <td>${METRICS[p].m1.default}</td>
-      </tr>`;
-      html += `<tr>
-        <td>${METRICS[p].m2.label}</td>
-        <td>${METRICS[p].m2.input}</td>
-        <td>${METRICS[p].weights[1]}</td>
-        <td>${METRICS[p].m2.default}</td>
-      </tr>`;
+      html += `<tr><td rowspan="2"><b>${p}</b></td><td>${METRICS[p].m1.label}</td><td>${METRICS[p].m1.input}</td><td>${METRICS[p].weights[0]}</td><td>${METRICS[p].m1.default}</td></tr>`;
+      html += `<tr><td>${METRICS[p].m2.label}</td><td>${METRICS[p].m2.input}</td><td>${METRICS[p].weights[1]}</td><td>${METRICS[p].m2.default}</td></tr>`;
     }
-    tbl.innerHTML = html;
+    tbl.innerHTML=html;
   }
 
   // ---- Views ----
@@ -709,7 +683,6 @@
     document.getElementById("view_"+view).classList.add("active");
     document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
     document.getElementById("tab_"+view).classList.add("active");
-
     if (view === "pillar") renderPillarView();
     if (view === "pulse") renderPulseView();
     if (view === "overview") updateAll();
@@ -720,42 +693,34 @@
     const {pillarScores, metricScores} = compute();
     const p = document.getElementById("pillar_select").value || PILLAR_ORDER[0];
 
-    const wrap = document.getElementById("pillar_fields");
-    wrap.innerHTML = "";
-    const m1 = metricScores[p].m1, m2 = metricScores[p].m2;
-
-    const f1 = document.createElement("div");
-    f1.className="field";
-    f1.innerHTML = `<label><span>${m1.spec.label}</span><span class="pill">${m1.spec.units||""}</span></label>
-      <div class="small" style="margin-top:6px;"><b>Current value:</b> ${m1.raw} ${m1.spec.units||""} • <b>Score:</b> ${m1.score.toFixed(0)}/100</div>
-      <div class="help">${MODE==="upload" ? "Driven by uploaded Excel." : "Driven by Tier 1 inputs."}</div>`;
-
-    const f2 = document.createElement("div");
-    f2.className="field";
-;
-    f2.innerHTML = `<label><span>${m2.spec.label}</span><span class="pill">${m2.spec.units||""}</span></label>
-      <div class="small" style="margin-top:6px;"><b>Current value:</b> ${m2.raw} ${m2.spec.units||""} • <b>Score:</b> ${m2.score.toFixed(0)}/100</div>
-      <div class="help">${MODE==="upload" ? "Driven by uploaded Excel." : "Driven by Tier 1 inputs."}</div>`;
-
-    wrap.appendChild(f1);
-    wrap.appendChild(f2);
+    const wrap=document.getElementById("pillar_fields");
+    wrap.innerHTML="";
+    const m1=metricScores[p].m1, m2=metricScores[p].m2;
+    const f1=document.createElement("div"); f1.className="field";
+    f1.innerHTML=`<label><span>${MODE==="upload" ? "Tier 3 KPI 1 (computed)" : "Tier 1 KPI 1 (proxy)"} — ${PILLAR_ORDER.includes(p)?p:""}</span><span class="pill">score</span></label>
+      <div class="small" style="margin-top:6px;"><b>Score:</b> ${m1.score.toFixed(0)}/100</div>
+      <div class="help">${MODE==="upload" ? "Computed from encounter-level evidence (tasks + documentation)." : "User-set proxy input."}</div>`;
+    const f2=document.createElement("div"); f2.className="field";
+    f2.innerHTML=`<label><span>${MODE==="upload" ? "Tier 3 KPI 2 (computed)" : "Tier 1 KPI 2 (proxy)"} — ${PILLAR_ORDER.includes(p)?p:""}</span><span class="pill">score</span></label>
+      <div class="small" style="margin-top:6px;"><b>Score:</b> ${m2.score.toFixed(0)}/100</div>
+      <div class="help">${MODE==="upload" ? "Computed from encounter-level evidence (tasks + documentation)." : "User-set proxy input."}</div>`;
+    wrap.appendChild(f1); wrap.appendChild(f2);
 
     const score = pillarScores[p];
     setText("pillar_score_value", score.toFixed(0));
-    const [rb, _, cls] = readinessBand(score);
+    const [rb,_,cls]=readinessBand(score);
     setText("pillar_score_band", rb);
-    setClass("pillar_score_badge", cls);
-    setText("pillar_score_badge", `${p}: ${score.toFixed(0)}/100`);
-
+    const badge=document.getElementById("pillar_score_badge");
+    if (badge){ badge.classList.remove("good","warn","bad"); badge.classList.add(cls); badge.textContent=`${p}: ${score.toFixed(0)}/100`; }
     let next = STAGES.find(s=>score < s.min && s.min>0);
     if (!next) next = STAGES[STAGES.length-1];
     setText("pillar_gate", `≥${next.min}`);
 
-    const prompts = [
-      `What is the single workflow failure mode most likely to explain the low KPI score(s) in ${p}?`,
-      `Which unit/service line is the outlier—and what control would reduce variance within 30–60 days?`,
-      `What “documentation fidelity” standard would make this pillar audit-defensible (policy, EHR, training)?`,
-      `What would it take to consistently hit the next gate (≥${next.min}) across all sites?`
+    const prompts=[
+      `Where is the evidence weakest in ${p}: missing timestamps, missing touchpoints, or missing attestations?`,
+      `Which documentation element would most reduce rework (attendant task burden) in the next 30 days?`,
+      `Which unit/service line is the outlier—and what control would reduce variance quickly?`,
+      `What is the minimum evidence standard needed to reliably meet the next gate (≥${next.min})?`
     ];
     setText("exec_prompts", prompts.join(" "));
 
@@ -767,21 +732,18 @@
     const {lai, pillarScores} = compute();
     const [rb, rsk, cls] = readinessBand(lai);
     const st = stageFrom(lai, pillarScores);
-
     setText("lai_value_2", lai.toFixed(0));
     setText("lai_band_2", rb);
     setText("risk_label_2", rsk);
     setText("stage_label_2", `${st.stage.name}: ${st.stage.label}`);
     setText("stage_desc_2", st.stage.desc);
     setText("stage_rationale", st.rationale);
-
     renderGauge("gauge_pulse", lai, "LAI Pulse");
     renderHeatmap("heatmap_pulse", pillarScores);
   }
 
   function topOpportunities(pillarScores, n=3){
-    const arr = Object.entries(pillarScores).sort((a,b)=>a[1]-b[1]);
-    return arr.slice(0,n);
+    return Object.entries(pillarScores).sort((a,b)=>a[1]-b[1]).slice(0,n);
   }
 
   function updateAll(){
@@ -789,28 +751,25 @@
     const [rb, rsk, cls] = readinessBand(lai);
     const st = stageFrom(lai, pillarScores);
     const opp = topOpportunities(pillarScores, 3).map(([p,s])=>`${p} (${s.toFixed(0)})`).join(" • ");
-
     setText("lai_value", lai.toFixed(0));
     setText("lai_band", rb);
     setText("risk_label", rsk);
     setText("stage_label", `${st.stage.name}: ${st.stage.label}`);
     setText("stage_desc", st.stage.desc);
     setText("opp_list", opp || "—");
-
     renderGauge("gauge_overview", lai, "LAI Pulse");
     renderBar("bar_overview", pillarScores);
-
     if (document.getElementById("view_pillar").classList.contains("active")) renderPillarView();
     if (document.getElementById("view_pulse").classList.contains("active")) renderPulseView();
   }
 
-  // ---- Reset / Expand / Collapse ----
+  // ---- Tier 1 actions ----
   function resetDefaults(){
-    if (MODE === "upload") return; // prevent confusion
+    if (MODE === "upload") return;
     for (const p of PILLAR_ORDER){
       for (const k of ["m1","m2"]){
-        const spec = METRICS[p][k];
-        const el = document.getElementById(idFor(p,k));
+        const spec=METRICS[p][k];
+        const el=document.getElementById(`${PILLAR_DISPLAY_TO_ID[p]}__${k}`);
         if (!el) continue;
         el.value = spec.default;
       }
@@ -824,260 +783,617 @@
   function downloadText(filename, text, mime="text/plain"){
     const blob = new Blob([text], {type:mime});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href=url; a.download=filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const a=document.createElement("a"); a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
   function exportInputsJSON(){
     const inputs = {};
     for (const p of PILLAR_ORDER){
       inputs[p] = {};
       for (const k of ["m1","m2"]){
-        const spec = METRICS[p][k];
-        inputs[p][k] = getRaw(p,k,spec);
+        inputs[p][k] = getRaw(p,k,METRICS[p][k]);
       }
     }
-    downloadText("lai_inputs.json", JSON.stringify(inputs, null, 2), "application/json");
+    downloadText("lai_inputs.json", JSON.stringify(inputs,null,2), "application/json");
   }
   function exportScoresCSV(){
     const {lai, pillarScores} = compute();
-    let rows = [["Metric","Score"]];
-    rows.push(["LAI", lai.toFixed(2)]);
-    for (const p of PILLAR_ORDER){
-      rows.push([p, pillarScores[p].toFixed(2)]);
-    }
+    const rows=[["Metric","Score"],["LAI",lai.toFixed(2)],...PILLAR_ORDER.map(p=>[p,pillarScores[p].toFixed(2)])];
     const csv = rows.map(r=>r.map(v=>String(v).replaceAll('"','""')).map(v=>`"${v}"`).join(",")).join("\n");
     downloadText("lai_scores.csv", csv, "text/csv");
   }
 
-  // ---- Template download ----
+  // ---- Template download (for LAI_Pillar_Metrics) ----
   function downloadTemplate(){
-    // CSV is simplest and works with Excel.
-    const header = ["pillar_name","metric_1_value","metric_2_value","denominator","reporting_period"];
-    const rp = "Q1 2026";
-    const rows = [header.join(",")];
+    const header=["pillar_name","metric_1_value","metric_2_value","denominator","reporting_period"];
+    const rp="Q1 2026";
+    const rows=[header.join(",")];
     for (const p of PILLAR_ORDER){
-      // Provide example values aligned to defaults (raw values, not scores)
-      const m1 = METRICS[p].m1.default;
-      const m2 = METRICS[p].m2.default;
-      const denom = 100;
-      rows.push([`"${p}"`,`"${m1}"`,`"${m2}"`,denom,`"${rp}"`].join(","));
+      rows.push([`"${p}"`,50,50,100,`"${rp}"`].join(","));
     }
     downloadText("LAI_Pillar_Metrics_template.csv", rows.join("\n"), "text/csv");
   }
 
-  // ---- Upload parsing ----
-  function normKey(k){ return String(k||"").trim().toLowerCase(); }
-  function canonPillar(name){
-    const n = String(name||"").trim().toLowerCase();
-    for (const p of PILLAR_ORDER){
-      if (p.toLowerCase() === n) return p;
-    }
-    // allow minor variations
-    if (n === "quality & safety" || n === "quality and safety") return "Quality and Safety";
-    if (n === "technology" || n === "tech innovation") return "Technology Innovation";
-    return null;
+  // ---- Tier 3 Auto-compute from Encounter_Level_Data ----
+  function getAdvancedFlag(row){
+    // prefer advanced_case_flag, else exemplar_type == advanced_maternal
+    const a = yn(row["advanced_case_flag"]);
+    if (a !== null) return a===1;
+    const et = String(row["exemplar_type"] ?? "").trim().toLowerCase();
+    return et === "advanced_maternal";
   }
 
+  function weightsFor(rows, pillarName){
+    const advMode = document.getElementById("chk_advanced_mode")?.checked;
+    if (!advMode) return rows.map(_=>1);
+
+    // D2: weight advanced maternal encounters heavier in selected pillars
+    const heavyPillars = new Set(["Compliance","Quality and Safety","Workflow Optimization","Access"]);
+    const base = rows.map(r=> getAdvancedFlag(r) ? 2 : 1);
+    if (heavyPillars.has(pillarName)) return base;
+    // other pillars remain equal weighting
+    return rows.map(_=>1);
+  }
+
+  function computeReworkPenalty(rows, weights){
+    // penalty up to 25% based on attendant_tasks_count
+    const vals = rows.map(r=>{
+      const t = num(r["attendant_tasks_count"]);
+      if (t===null) return null;
+      const tn = Math.min(t/10, 1); // cap at 10
+      return tn;
+    });
+    const meanT = weightedMean(vals, weights);
+    if (meanT===null) return 1;
+    return clamp(1 - 0.25*meanT, 0.75, 1.0);
+  }
+
+  function computeIntegrity(rows, weights){
+    // Among interpreter_requested==Yes: request & start timestamps documented
+    const ind = [];
+    const w = [];
+    for (let i=0;i<rows.length;i++){
+      const r=rows[i];
+      const req = yn(r["interpreter_requested"]);
+      if (req !== 1) continue;
+      const ok = (yn(r["interp_request_documented"])===1 && yn(r["interp_start_documented"])===1) ? 1 : 0;
+      ind.push(ok);
+      w.push(weights[i]);
+    }
+    const rate = weightedRate(ind, w);
+    return rate===null ? 0 : (rate/100);
+  }
+
+  function computeTouchpointRatio(row){
+    const fields = [
+      "interp_or_qbs_preassessment_triage",
+      "interp_or_qbs_hp",
+      "interp_or_qbs_diagnosticrev",
+      "interp_or_qbs_vitals",
+      "interp_or_qbs_followup",
+      "interp_or_qbs_dischargeplan",
+      "interp_or_qbs_pteduc"
+    ];
+    let numYes=0, denom=0;
+    for (const f of fields){
+      const v = yn(row[f]);
+      if (v===null) continue;
+      denom += 1;
+      if (v===1) numYes += 1;
+    }
+    if (denom===0) return null;
+    return numYes/denom;
+  }
+
+  function documentationMaturityComposite(rows, weights){
+    // Components: E/M completeness, MDM index, critical care sufficiency, teaching attestation, CCM completeness, TCM completeness
+    // Each component returns a rate 0..100 or null; weighted by "elements required"
+    const components = [];
+
+    // 1) E/M completeness
+    {
+      const ind = rows.map(r=> yn(r["doc_em_mdm_time_complete"]));
+      const rate = weightedRate(ind.map(v=>v===null?null:v), weights);
+      components.push({name:"em_complete", rate:rate, w:2});
+    }
+
+    // 2) MDM data documentation index (3 fields)
+    {
+      const vals = rows.map(r=>{
+        const a=yn(r["mdm_data_review_documents_present"]);
+        const b=yn(r["mdm_independent_interpretation_documented"]);
+        const c=yn(r["mdm_discussion_external_provider_documented"]);
+        const arr=[a,b,c].filter(x=>x!==null);
+        if (!arr.length) return null;
+        return arr.reduce((s,x)=>s+x,0)/arr.length; // 0..1
+      });
+      const mean = weightedMean(vals, weights);
+      const rate = mean===null ? null : 100*mean;
+      components.push({name:"mdm_index", rate:rate, w:3});
+    }
+
+    // 3) Critical care sufficiency among has_99291
+    {
+      const ind=[]; const w=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (yn(r["has_99291"])!==1) continue;
+        const def=yn(r["critical_care_met_definition_documented"])===1;
+        const act=yn(r["critical_care_activities_documented"])===1;
+        const t = num(r["critical_care_time_minutes_documented"])!==null;
+        ind.push((def && act && t) ? 1 : 0);
+        w.push(weights[i]);
+      }
+      const rate = weightedRate(ind, w);
+      components.push({name:"critical_care", rate:rate, w:3});
+    }
+
+    // 4) Teaching attestation among has_gc or has_ge
+    {
+      const ind=[]; const w=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (!(yn(r["has_gc"])===1 || yn(r["has_ge"])===1)) continue;
+        ind.push(yn(r["doc_teaching_attestation_complete"])===1 ? 1 : 0);
+        w.push(weights[i]);
+      }
+      const rate = weightedRate(ind, w);
+      components.push({name:"teaching", rate:rate, w:2});
+    }
+
+    // 5) CCM completeness among has_ccm
+    {
+      const ind=[]; const w=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (yn(r["has_ccm"])!==1) continue;
+        const c=yn(r["ccm_patient_consent_documented"])===1;
+        const p=yn(r["ccm_care_plan_documented"])===1;
+        const t = num(r["ccm_time_minutes_documented"])!==null;
+        ind.push((c && p && t) ? 1 : 0);
+        w.push(weights[i]);
+      }
+      const rate = weightedRate(ind, w);
+      components.push({name:"ccm", rate:rate, w:3});
+    }
+
+    // 6) TCM completeness among has_tcm
+    {
+      const ind=[]; const w=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (yn(r["has_tcm"])!==1) continue;
+        const d=yn(r["tcm_discharge_date_documented"])===1;
+        const ic=yn(r["tcm_interactive_contact_made"])===1;
+        const f2f=yn(r["tcm_face_to_face_visit_completed"])===1;
+        ind.push((d && ic && f2f) ? 1 : 0);
+        w.push(weights[i]);
+      }
+      const rate = weightedRate(ind, w);
+      components.push({name:"tcm", rate:rate, w:3});
+    }
+
+    // Weighted mean of component rates (ignore null)
+    let sw=0, sx=0;
+    for (const c of components){
+      if (c.rate===null || c.rate===undefined) continue;
+      sw += c.w;
+      sx += c.w * c.rate;
+    }
+    return sw>0 ? sx/sw : 0;
+  }
+
+  function computeFromEncounterRows(rows){
+    // Compute two KPI scores (0..100) per pillar from encounter-level evidence fields
+    const result = {};
+    const reporting_period = rows[0]?.["reporting_quarter"] || rows[0]?.["reporting_period"] || "";
+    const n = rows.length;
+
+    // Access
+    {
+      const weights = weightsFor(rows,"Access");
+      // median delay among interpreter_requested==Yes
+      const delays=[]; const w=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (yn(r["interpreter_requested"])!==1) continue;
+        const d=num(r["interpreter_delay_minutes"]);
+        if (d===null) continue;
+        delays.push(d);
+        w.push(weights[i]);
+      }
+      const med = weightedMedian(delays, w);
+      const delayScore = delayScoreFromMedian(med);
+      const integrity = computeIntegrity(rows, weights);
+      const kpi1 = clamp(delayScore * integrity, 0, 100);
+
+      // request reliability among interpreter_required==Yes
+      const ind=[]; const ww=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (yn(r["interpreter_required"])!==1) continue;
+        ind.push(yn(r["interpreter_requested"])===1 ? 1 : 0);
+        ww.push(weights[i]);
+      }
+      const kpi2 = weightedRate(ind, ww) ?? 0;
+
+      result["Access"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Patient Experience
+    {
+      const weights = weightsFor(rows,"Patient Experience");
+      const kpi1 = weightedRate(rows.map(r=>yn(r["provider_explained_understandably"])), weights) ?? 0;
+      const kpi2 = weightedRate(rows.map(r=>yn(r["provider_listened"])), weights) ?? 0;
+      result["Patient Experience"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Outcomes
+    {
+      const weights = weightsFor(rows,"Outcomes");
+      const kpi1 = weightedRate(rows.map(r=>yn(r["preventive_service_completed"])), weights) ?? 0;
+      const readm = weightedRate(rows.map(r=>yn(r["readmission_30d"])), weights) ?? 0;
+      const kpi2 = clamp(100 - readm, 0, 100);
+      result["Outcomes"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Compliance
+    {
+      const weights = weightsFor(rows,"Compliance");
+      // composite: section_1557, clinical_language_documented, timestamp integrity (per encounter)
+      const comp = rows.map(r=>{
+        const a=yn(r["section_1557_documented"]);
+        const b=yn(r["clinical_language_documented"]);
+        const c=(yn(r["interp_request_documented"])===1 && yn(r["interp_start_documented"])===1) ? 1 : 0;
+        const arr=[a,b,c].filter(x=>x!==null);
+        if (!arr.length) return null;
+        return arr.reduce((s,x)=>s+x,0)/arr.length; // 0..1
+      });
+      const kpi1 = (weightedMean(comp, weights) ?? 0) * 100;
+      const kpi2 = weightedRate(rows.map(r=>yn(r["doc_interpreter_touchpoints_complete"])), weights) ?? 0;
+      result["Compliance"] = {m1:clamp(kpi1,0,100), m2:kpi2};
+    }
+
+    // Patient Engagement
+    {
+      const weights = weightsFor(rows,"Patient Engagement");
+      const kpi1 = weightedRate(rows.map(r=>yn(r["teach_back_documented"])), weights) ?? 0;
+      const concord = rows.map(r=>{
+        const a = String(r["discharge_instructions_language"] ?? "").trim().toLowerCase();
+        const b = String(r["preferred_language"] ?? "").trim().toLowerCase();
+        if (!a || !b) return null;
+        return a===b ? 1 : 0;
+      });
+      const kpi2 = weightedRate(concord, weights) ?? 0;
+      result["Patient Engagement"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Financial Stewardship
+    {
+      const weights = weightsFor(rows,"Financial Stewardship");
+      const avoid = weightedRate(rows.map(r=>yn(r["avoidable_los_flag"])), weights) ?? 0;
+      const miss = weightedRate(rows.map(r=>yn(r["missed_reimbursement_opportunity"])), weights) ?? 0;
+      const kpi1 = clamp(100 - avoid, 0, 100);
+      const kpi2_base = clamp(100 - miss, 0, 100);
+      const penalty = computeReworkPenalty(rows, weights);
+      const kpi2 = clamp(kpi2_base * penalty, 0, 100);
+      result["Financial Stewardship"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Quality and Safety
+    {
+      const weights = weightsFor(rows,"Quality and Safety");
+      const adv = weightedRate(rows.map(r=>yn(r["adverse_event_flag"])), weights) ?? 0;
+      const kpi1 = clamp(100 - adv, 0, 100);
+      const kpi2 = weightedRate(rows.map(r=>yn(r["safety_event_reported"])), weights) ?? 0;
+      result["Quality and Safety"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Workforce Development
+    {
+      const weights = weightsFor(rows,"Workforce Development");
+      const kpi1 = weightedRate(rows.map(r=>yn(r["staff_language_access_training_current"])), weights) ?? 0;
+      const qbs = weightedRate(rows.map(r=>yn(r["provider_qbs_qualified"])), weights) ?? 0;
+      const match = weightedRate(rows.map(r=>yn(r["provider_language_matches_patient"])), weights) ?? 0;
+      const kpi2 = clamp((qbs + match)/2, 0, 100);
+      result["Workforce Development"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Workflow Optimization
+    {
+      const weights = weightsFor(rows,"Workflow Optimization");
+      const ratios = rows.map(r=>computeTouchpointRatio(r)); // 0..1
+      const meanRatio = weightedMean(ratios, weights) ?? 0;
+      const integrity = computeIntegrity(rows, weights);
+      const kpi1 = clamp(100 * meanRatio * integrity, 0, 100);
+      const kpi2 = weightedRate(rows.map(r=>yn(r["doc_interpreter_touchpoints_complete"])), weights) ?? 0;
+      result["Workflow Optimization"] = {m1:kpi1, m2:kpi2};
+    }
+
+    // Technology Innovation
+    {
+      const weights = weightsFor(rows,"Technology Innovation");
+      // tech utilization proxy: has_t1013 OR VRI modality
+      const util = rows.map(r=>{
+        const a = yn(r["has_t1013"]);
+        const mod = String(r["interpreter_modality"] ?? "").trim().toLowerCase();
+        const vri = (mod === "vri") ? 1 : 0;
+        const arr=[a, vri].filter(x=>x!==null);
+        if (!arr.length) return null;
+        return arr.reduce((s,x)=>s+x,0)/arr.length; // 0..1
+      });
+      const utilRate = (weightedMean(util, weights) ?? 0) * 100;
+
+      // tech integration level 1..5
+      const ti = rows.map(r=>{
+        const v = num(r["tech_integration_level"]);
+        if (v===null) return null;
+        return clamp(((v-1)/4)*100, 0, 100);
+      });
+      const tiScore = weightedMean(ti, weights) ?? 0;
+      const kpi1 = clamp((utilRate + tiScore)/2, 0, 100);
+
+      // documentation maturity composite + rework penalty
+      const maturity = documentationMaturityComposite(rows, weights);
+      const penalty = computeReworkPenalty(rows, weights);
+      const kpi2 = clamp(maturity * penalty, 0, 100);
+
+      result["Technology Innovation"] = {m1:kpi1, m2:kpi2};
+    }
+
+    return {pillarMetrics: result, meta:{n, reporting_period}};
+  }
+
+  // ---- Upload parsing ----
   async function handleFile(file){
     clearErr();
     if (!file) return;
-    const ext = file.name.toLowerCase().split(".").pop();
 
-    // Parse into rows of objects: {pillar_name, metric_1_value, metric_2_value, denominator, reporting_period}
-    let rows = [];
+    const ext = file.name.toLowerCase().split(".").pop();
+    let wb=null;
+    let csvText=null;
+
     try{
       if (ext === "csv"){
-        const text = await file.text();
-        const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
-        const headers = lines[0].split(",").map(h=>h.replace(/^"|"$/g,"").trim());
-        for (let i=1;i<lines.length;i++){
-          const parts = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-          const obj = {};
-          headers.forEach((h,idx)=>{
-            const v = (parts[idx] ?? "").replace(/^"|"$/g,"").trim();
-            obj[h] = v;
-          });
-          rows.push(obj);
-        }
+        csvText = await file.text();
       } else {
-        if (typeof XLSX === "undefined"){
-          throw new Error("XLSX library did not load.");
-        }
+        if (typeof XLSX === "undefined") throw new Error("XLSX library did not load.");
         const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, {type:"array"});
-        const sheetName = wb.SheetNames.find(n=>n.trim().toLowerCase() === "lai_pillar_metrics") || wb.SheetNames[0];
-        const ws = wb.Sheets[sheetName];
-        rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+        wb = XLSX.read(buf, {type:"array"});
       }
     } catch(e){
-      showErr(`Could not parse file. Error: <code>${String(e)}</code>`);
+      showErr(`Could not read file. Error: <code>${String(e)}</code>`);
       return;
     }
 
-    // Validate + map
-    const mapped = {};
-    let denomSum = 0;
-    let rp = null;
+    // 1) If Excel and has Encounter_Level_Data => auto compute
+    if (wb){
+      const sheetLower = wb.SheetNames.map(n=>[n, n.trim().toLowerCase()]);
+      const sheetEncounter = sheetLower.find(([n,l])=>l==="encounter_level_data");
+      const sheetPillar = sheetLower.find(([n,l])=>l==="lai_pillar_metrics");
 
-    const required = ["pillar_name","metric_1_value","metric_2_value"];
-    // detect columns (case-insensitive)
-    const first = rows[0] || {};
-    const keys = Object.keys(first).map(k=>[normKey(k), k]);
-    function findCol(target){
-      const t = normKey(target);
-      const hit = keys.find(([nk,_])=>nk===t);
-      return hit ? hit[1] : null;
-    }
-    const colP = findCol("pillar_name");
-    const col1 = findCol("metric_1_value");
-    const col2 = findCol("metric_2_value");
-    const colD = findCol("denominator");
-    const colR = findCol("reporting_period");
+      if (sheetEncounter){
+        const ws = wb.Sheets[sheetEncounter[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
 
-    if (!colP || !col1 || !col2){
-      showErr(`Missing required columns. Found: <code>${Object.keys(first).join(", ")}</code><br>
-        Required: <code>pillar_name</code>, <code>metric_1_value</code>, <code>metric_2_value</code>.`);
-      return;
-    }
+        // compute and load
+        const computed = computeFromEncounterRows(rows);
+        uploadedRaw = computed.pillarMetrics;
+        uploadedMeta = {fileName:file.name, reporting_period: computed.meta.reporting_period, denominator_sum: computed.meta.n};
 
-    for (const r of rows){
-      const p = canonPillar(r[colP]);
-      if (!p) continue;
-      const v1 = r[col1];
-      const v2 = r[col2];
-      // Keep as string if banded, else number
-      mapped[p] = {m1: v1, m2: v2};
+        setMode("upload", "Tier 3 auto-compute from Encounter_Level_Data");
+        setText("upload_status", `Loaded encounter-level dataset: ${file.name}`);
+        setHTML("upload_meta", ` • Reporting period: <b>${uploadedMeta.reporting_period || "—"}</b> • Encounters: <b>${uploadedMeta.denominator_sum.toLocaleString()}</b>`);
+        document.getElementById("btn_clear_upload").disabled = false;
+        COMPUTE = "encounter_auto";
 
-      if (colD){
-        const d = Number(r[colD]) || 0;
-        denomSum += d;
-      }
-      if (!rp && colR && String(r[colR]).trim().length>0){
-        rp = String(r[colR]).trim();
-      }
-    }
-
-    // ensure all pillars present
-    const missing = PILLAR_ORDER.filter(p=>!mapped[p]);
-    if (missing.length){
-      showErr(`File parsed, but missing pillars: <code>${missing.join(", ")}</code>. Please include all 10 pillars for a full LAI.`);
-      return;
-    }
-
-    // Coerce numeric fields when not banded
-    for (const p of PILLAR_ORDER){
-      for (const k of ["m1","m2"]){
-        const spec = METRICS[p][k];
-        let v = mapped[p][k];
-        if (spec.input === "band"){
-          // keep as-is string
-          mapped[p][k] = String(v).trim();
-        } else {
-          mapped[p][k] = Number(v);
+        // sync Tier 1 controls to show scores (read-only) for transparency
+        for (const p of PILLAR_ORDER){
+          const el1=document.getElementById(`${PILLAR_DISPLAY_TO_ID[p]}__m1`);
+          const el2=document.getElementById(`${PILLAR_DISPLAY_TO_ID[p]}__m2`);
+          if (el1) el1.value = 50;
+          if (el2) el2.value = 50;
         }
+
+        updateAll();
+        showOk(`Tier 3 computed pillar KPIs from encounter-level evidence. Toggle “Advanced Case Mode (D2)” to re-weight advanced maternal health encounters.`);
+        return;
       }
+
+      // 2) else if has LAI_Pillar_Metrics => use pre-aggregated
+      if (sheetPillar){
+        const ws = wb.Sheets[sheetPillar[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+        const mapped = {};
+
+        const first = rows[0] || {};
+        const cols = Object.keys(first);
+        const findCol = (name)=> cols.find(c=>normKey(c)===normKey(name));
+
+        const cP = findCol("pillar_name");
+        const c1 = findCol("metric_1_value");
+        const c2 = findCol("metric_2_value");
+        const cD = findCol("denominator");
+        const cR = findCol("reporting_period");
+
+        if (!cP || !c1 || !c2){
+          showErr(`LAI_Pillar_Metrics is missing required columns. Found: <code>${cols.join(", ")}</code>`);
+          return;
+        }
+
+        let denomSum=0, rp=null;
+        for (const r of rows){
+          const name = String(r[cP] ?? "").trim();
+          if (!name) continue;
+          // match to our pillar names
+          const match = PILLAR_ORDER.find(p=>p.toLowerCase() === name.toLowerCase());
+          if (!match) continue;
+          mapped[match] = {m1: Number(r[c1]), m2: Number(r[c2])};
+          if (cD) denomSum += Number(r[cD])||0;
+          if (!rp && cR && String(r[cR]||"").trim()) rp = String(r[cR]).trim();
+        }
+        const missing = PILLAR_ORDER.filter(p=>!mapped[p]);
+        if (missing.length){
+          showErr(`LAI_Pillar_Metrics parsed but missing pillars: <code>${missing.join(", ")}</code>.`);
+          return;
+        }
+        uploadedRaw = mapped;
+        uploadedMeta = {fileName:file.name, reporting_period: rp, denominator_sum: denomSum || rows.length};
+        setMode("upload", "Tier 3 using uploaded LAI_Pillar_Metrics");
+        setText("upload_status", `Loaded aggregated pillar metrics: ${file.name}`);
+        setHTML("upload_meta", ` • Reporting period: <b>${rp || "—"}</b> • Denominator: <b>${(uploadedMeta.denominator_sum||0).toLocaleString()}</b>`);
+        document.getElementById("btn_clear_upload").disabled = false;
+        COMPUTE = "pillar_agg";
+        updateAll();
+        showOk(`Tier 3 loaded pre-aggregated pillar metrics. If you want automatic computation, include an Encounter_Level_Data sheet.`);
+        return;
+      }
+
+      showErr(`Workbook does not contain <code>Encounter_Level_Data</code> or <code>LAI_Pillar_Metrics</code>. Found sheets: <code>${wb.SheetNames.join(", ")}</code>.`);
+      return;
     }
 
-    uploadedRaw = mapped;
-    uploadedMeta = {fileName:file.name, reporting_period:rp, denominator_sum:(colD ? denomSum : null)};
-    setMode("upload");
-
-    // Update upload UI
-    setText("upload_status", `Loaded: ${file.name}`);
-    const metaBits = [];
-    if (rp) metaBits.push(`Reporting period: <b>${rp}</b>`);
-    if (colD) metaBits.push(`Denominator (sum): <b>${denomSum.toLocaleString()}</b>`);
-    setHTML("upload_meta", metaBits.length ? ` • ${metaBits.join(" • ")}` : "");
-    document.getElementById("btn_clear_upload").disabled = false;
-
-    // Sync Tier 1 controls to show uploaded values (read-only)
-    for (const p of PILLAR_ORDER){
-      for (const k of ["m1","m2"]){
-        const spec = METRICS[p][k];
-        const el = document.getElementById(idFor(p,k));
-        if (!el) continue;
-        const v = uploadedRaw[p][k];
-        if (spec.input === "band") el.value = v;
-        else el.value = v;
+    // CSV path: treat as LAI_Pillar_Metrics template
+    if (csvText){
+      const lines = csvText.split(/\r?\n/).filter(l=>l.trim().length>0);
+      const headers = lines[0].split(",").map(h=>h.replace(/^"|"$/g,"").trim());
+      const idx = (name)=> headers.findIndex(h=>normKey(h)===normKey(name));
+      const iP = idx("pillar_name"), i1=idx("metric_1_value"), i2=idx("metric_2_value");
+      if (iP<0 || i1<0 || i2<0){
+        showErr(`CSV missing required columns. Required: pillar_name, metric_1_value, metric_2_value.`);
+        return;
       }
+      const mapped={};
+      for (let i=1;i<lines.length;i++){
+        const parts = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        const get = (j)=> (parts[j] ?? "").replace(/^"|"$/g,"").trim();
+        const pName = get(iP);
+        const match = PILLAR_ORDER.find(p=>p.toLowerCase() === pName.toLowerCase());
+        if (!match) continue;
+        mapped[match] = {m1:Number(get(i1)), m2:Number(get(i2))};
+      }
+      const missing = PILLAR_ORDER.filter(p=>!mapped[p]);
+      if (missing.length){
+        showErr(`CSV parsed but missing pillars: <code>${missing.join(", ")}</code>.`);
+        return;
+      }
+      uploadedRaw = mapped;
+      uploadedMeta = {fileName:file.name};
+      setMode("upload", "Tier 3 using uploaded pillar CSV");
+      setText("upload_status", `Loaded aggregated pillar metrics: ${file.name}`);
+      setHTML("upload_meta", "");
+      document.getElementById("btn_clear_upload").disabled = false;
+      COMPUTE = "pillar_agg";
+      updateAll();
+      showOk(`Tier 3 loaded pre-aggregated pillar metrics from CSV.`);
     }
-
-    updateAll();
-    showOk(`Upload active. Tier 1 inputs are locked until you click “Clear upload.”`);
   }
 
   function clearUpload(){
     uploadedRaw = null;
-    uploadedMeta = {fileName:null, reporting_period:null, denominator_sum:null};
+    uploadedMeta = {};
     document.getElementById("file_input").value = "";
     document.getElementById("btn_clear_upload").disabled = true;
     setText("upload_status", "No file loaded.");
     setHTML("upload_meta","");
-    setMode("manual");
-    // restore defaults (and enable)
+    COMPUTE = "tier1_proxy";
+    setMode("manual", "Tier 1 proxy");
     resetDefaults();
-    showOk(`Upload cleared. Back to manual mode.`);
+    showOk(`Upload cleared. Back to Tier 1 proxy mode.`);
+  }
+
+  // When advanced mode toggles, recompute if encounter-level is active
+  function onAdvancedToggle(){
+    if (MODE !== "upload" || COMPUTE !== "encounter_auto") return;
+    // We don't store the raw encounter rows; for simplicity, require re-upload or keep last rows.
+    // To keep it interactive, we cache the last encounter rows in memory.
+    if (window.__lastEncounterRows){
+      const computed = computeFromEncounterRows(window.__lastEncounterRows);
+      uploadedRaw = computed.pillarMetrics;
+      updateAll();
+      showOk(`Advanced Case Mode ${document.getElementById("chk_advanced_mode").checked ? "ON" : "OFF"} — Tier 3 recomputed from encounter evidence.`);
+    }
+  }
+
+  // Patch handleFile to cache rows on encounter compute
+  const _handleFile = handleFile;
+  handleFile = async function(file){
+    // wrap to cache when encounter sheet is used
+    clearErr();
+    if (!file) return;
+    const ext = file.name.toLowerCase().split(".").pop();
+    if (ext === "csv"){
+      return _handleFile(file);
+    }
+    if (typeof XLSX === "undefined"){
+      showErr("XLSX library did not load.");
+      return;
+    }
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      const sheetLower = wb.SheetNames.map(n=>[n, n.trim().toLowerCase()]);
+      const sheetEncounter = sheetLower.find(([n,l])=>l==="encounter_level_data");
+      if (sheetEncounter){
+        const ws = wb.Sheets[sheetEncounter[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+        window.__lastEncounterRows = rows;
+      } else {
+        window.__lastEncounterRows = null;
+      }
+      // delegate to original logic by using same file again (no re-read needed for simplicity)
+      // We'll call the inner logic by temporarily setting a global and reusing parse with wb, but keep simple:
+    } catch(e){
+      // ignore cache if fails
+      window.__lastEncounterRows = null;
+    }
+    // Now call original _handleFile which will re-read; acceptable for our size (~1000 rows)
+    return _handleFile(file);
   }
 
   // ---- Wire controls ----
   function wire(){
     document.querySelectorAll(".tabbtn").forEach(btn=> btn.addEventListener("click", ()=> setActiveView(btn.dataset.view)));
-
     document.getElementById("btn_reset").addEventListener("click", resetDefaults);
     document.getElementById("btn_expand").addEventListener("click", expandAll);
     document.getElementById("btn_collapse").addEventListener("click", collapseAll);
     document.getElementById("btn_export_json").addEventListener("click", exportInputsJSON);
     document.getElementById("btn_export_csv").addEventListener("click", exportScoresCSV);
-
     document.getElementById("btn_back_overview_1").addEventListener("click", ()=> setActiveView("overview"));
     document.getElementById("btn_go_pulse_1").addEventListener("click", ()=> setActiveView("pulse"));
     document.getElementById("btn_back_overview_2").addEventListener("click", ()=> setActiveView("overview"));
     document.getElementById("btn_go_pillar_2").addEventListener("click", ()=> setActiveView("pillar"));
-
     document.getElementById("btn_download_template").addEventListener("click", downloadTemplate);
     document.getElementById("btn_clear_upload").addEventListener("click", clearUpload);
     document.getElementById("file_input").addEventListener("change", (e)=>{
-      const f = e.target.files && e.target.files[0];
+      const f=e.target.files && e.target.files[0];
       if (f) handleFile(f);
     });
-
-    // If user toggles "values already scored", rerender quickly
-    document.getElementById("chk_values_scored").addEventListener("change", ()=>{
-      if (MODE === "upload") updateAll();
-    });
+    document.getElementById("chk_advanced_mode").addEventListener("change", onAdvancedToggle);
   }
 
   // ---- Init ----
   function init(){
     try{
-      // Library checks
-      const plotlyOk = (typeof Plotly !== "undefined");
-      const xlsxOk = (typeof XLSX !== "undefined");
-      if (!plotlyOk){
-        showErr(`Plotly did not load. Charts will be disabled. If you need offline support, I can embed libraries inside this HTML (larger file).`);
-      } else if (!xlsxOk){
-        showErr(`Excel parsing library did not load. Upload may not work. If you need offline support, I can embed the parser library inside this HTML (larger file).`);
+      if (typeof Plotly === "undefined"){
+        showErr(`Plotly did not load. Charts will be disabled.`);
+      } else if (typeof XLSX === "undefined"){
+        showErr(`Excel parsing library did not load. Upload may not work.`);
       } else {
-        showOk(`Dashboard loaded. Tip: On GitHub Pages, ensure this file is named <b>index.html</b> in the published folder.`);
+        showOk(`Dashboard loaded. For GitHub Pages, rename this file to <b>index.html</b> and ensure Pages is publishing the correct branch/folder.`);
       }
-
       buildPillars();
       buildPillarSelect();
       buildKpiTable();
       wire();
-      setMode("manual");
+      setMode("manual", "Tier 1 proxy");
       resetDefaults();
       updateAll();
-    } catch (e){
-      showErr(`JavaScript error during initialization: <code>${String(e)}</code>. Open DevTools → Console for details.`);
+    } catch(e){
+      showErr(`Initialization error: <code>${String(e)}</code>`);
       console.error(e);
     }
   }
-
   window.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
