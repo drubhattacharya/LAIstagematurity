@@ -2268,18 +2268,24 @@
       const f=e.target.files && e.target.files[0];
       if (f) handleFile(f);
     });
-    document.getElementById("chk_advanced_mode").addEventListener("change", onAdvancedToggle);
-    document.getElementById("chk_sim_mode").addEventListener("change", onSimToggle);
-    document.getElementById("btn_sim_reset").addEventListener("click", resetSimulation);
-    document.getElementById("tier3_pillar_select").addEventListener("change", renderTier3Drilldown);
-    document.getElementById("btn_apply_filters").addEventListener("click", ()=>{
+    var el_chk_advanced_mode = document.getElementById("chk_advanced_mode");
+    if (el_chk_advanced_mode) el_chk_advanced_mode.addEventListener("change", onAdvancedToggle);
+    var el_chk_sim_mode = document.getElementById("chk_sim_mode");
+    if (el_chk_sim_mode) el_chk_sim_mode.addEventListener("change", onSimToggle);
+    var el_btn_sim_reset = document.getElementById("btn_sim_reset");
+    if (el_btn_sim_reset) el_btn_sim_reset.addEventListener("click", resetSimulation);
+    var el_tier3_pillar_select = document.getElementById("tier3_pillar_select");
+    if (el_tier3_pillar_select) el_tier3_pillar_select.addEventListener("change", renderTier3Drilldown);
+    var el_btn_apply_filters = document.getElementById("btn_apply_filters");
+    if (el_btn_apply_filters) el_btn_apply_filters.addEventListener("click", ()=>{
       if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
       tier3Filter.service_line = document.getElementById("flt_service_line").value || "All";
       tier3Filter.unit_id = document.getElementById("flt_unit_id").value || "All";
       recomputeTier3FromFilters();
       runServiceLineComparison();
     });
-    document.getElementById("btn_clear_filters").addEventListener("click", ()=>{
+    var el_btn_clear_filters = document.getElementById("btn_clear_filters");
+    if (el_btn_clear_filters) el_btn_clear_filters.addEventListener("click", ()=>{
       if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
       tier3Filter = {service_line:"All", unit_id:"All"};
       document.getElementById("flt_service_line").value = "All";
@@ -2287,7 +2293,8 @@
       recomputeTier3FromFilters();
       runServiceLineComparison();
     });
-    document.getElementById("btn_run_compare").addEventListener("click", runServiceLineComparison);
+    var el_btn_run_compare = document.getElementById("btn_run_compare");
+    if (el_btn_run_compare) el_btn_run_compare.addEventListener("click", runServiceLineComparison);
 
   }
 
@@ -2308,6 +2315,9 @@
       setMode("manual", "Tier 1 proxy");
       resetDefaults();
       updateAll();
+      // Re-render once external libs have fully loaded and layout has settled
+      window.addEventListener('load', ()=>{ try{ updateAll(); }catch(e){} });
+      setTimeout(()=>{ try{ updateAll(); }catch(e){} }, 250);
       renderTier3Drilldown();
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
