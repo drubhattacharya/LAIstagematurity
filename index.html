@@ -103,14 +103,44 @@
 </head>
 
 <body>
+
+<div id="js_health_banner" style="padding:10px 14px; margin:12px 18px; border:1px solid rgba(217,59,59,.35); background:rgba(217,59,59,.08); border-radius:14px; font-weight:900;">
+  JavaScript is not running (or failed early). This dashboard requires JavaScript for tabs, toggles, charts, and uploads.
+  <span style="font-weight:700;">Open DevTools → Console to see the error, or try a different browser profile.</span>
+</div>
+<noscript>
+  <div style="padding:10px 14px; margin:12px 18px; border:1px solid rgba(217,59,59,.35); background:rgba(217,59,59,.08); border-radius:14px; font-weight:900;">
+    JavaScript is disabled. Please enable JavaScript to use this dashboard.
+  </div>
+</noscript>
+<script>
+  // If this runs, JS is working; flip the banner to green and keep it visible as a quick diagnostic.
+  try{
+    const b = document.getElementById('js_health_banner');
+    if (b) {
+      b.style.borderColor = 'rgba(24,167,111,.35)';
+      b.style.background = 'rgba(24,167,111,.08)';
+      b.textContent = 'JavaScript is running. If charts are blank, your network may be blocking the Plotly/XLSX CDNs.';
+    }
+    window.addEventListener('error', function(e){
+      const bb = document.getElementById('js_health_banner');
+      if (bb){
+        bb.style.borderColor = 'rgba(217,59,59,.55)';
+        bb.style.background = 'rgba(217,59,59,.10)';
+        bb.textContent = 'JavaScript error: ' + (e.message || 'unknown error') + '. Open DevTools → Console for details.';
+      }
+    });
+  } catch(e){}
+</script>
+
 <header>
   <div class="wrap" style="padding:0 18px;">
     <h1>Language Access Index (LAI) — 3-Tier Navigation Dashboard</h1>
-    <div class="sub">Tier 1: Self-Assessment • Tier 2: Repositioning • Tier 3: Performance Improvement (validated by encounter-level evidence)</div>
+    <div class="sub">Tier 1: Preparedness proxy • Tier 2: Pillar drilldown • Tier 3: Performance validated from encounter-level evidence (optional Advanced Case Mode)</div>
     <div class="tabs" aria-label="Navigation tabs">
-      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Self-Assessment</button>
-      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Repositioning</button>
-      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — Performance Improvement</button>
+      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Overview</button>
+      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Pillar Deep Dive</button>
+      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — LAI Pulse</button>
     </div>
   </div>
 </header>
