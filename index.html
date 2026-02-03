@@ -103,44 +103,14 @@
 </head>
 
 <body>
-
-<div id="js_health_banner" style="padding:10px 14px; margin:12px 18px; border:1px solid rgba(217,59,59,.35); background:rgba(217,59,59,.08); border-radius:14px; font-weight:900;">
-  JavaScript is not running (or failed early). This dashboard requires JavaScript for tabs, toggles, charts, and uploads.
-  <span style="font-weight:700;">Open DevTools → Console to see the error, or try a different browser profile.</span>
-</div>
-<noscript>
-  <div style="padding:10px 14px; margin:12px 18px; border:1px solid rgba(217,59,59,.35); background:rgba(217,59,59,.08); border-radius:14px; font-weight:900;">
-    JavaScript is disabled. Please enable JavaScript to use this dashboard.
-  </div>
-</noscript>
-<script>
-  // If this runs, JS is working; flip the banner to green and keep it visible as a quick diagnostic.
-  try{
-    const b = document.getElementById('js_health_banner');
-    if (b) {
-      b.style.borderColor = 'rgba(24,167,111,.35)';
-      b.style.background = 'rgba(24,167,111,.08)';
-      b.textContent = 'JavaScript is running. If charts are blank, your network may be blocking the Plotly/XLSX CDNs.';
-    }
-    window.addEventListener('error', function(e){
-      const bb = document.getElementById('js_health_banner');
-      if (bb){
-        bb.style.borderColor = 'rgba(217,59,59,.55)';
-        bb.style.background = 'rgba(217,59,59,.10)';
-        bb.textContent = 'JavaScript error: ' + (e.message || 'unknown error') + '. Open DevTools → Console for details.';
-      }
-    });
-  } catch(e){}
-</script>
-
 <header>
   <div class="wrap" style="padding:0 18px;">
     <h1>Language Access Index (LAI) — 3-Tier Navigation Dashboard</h1>
-    <div class="sub">Tier 1: Preparedness proxy • Tier 2: Pillar drilldown • Tier 3: Performance validated from encounter-level evidence (optional Advanced Case Mode)</div>
+    <div class="sub">Tier 1: Self-Assessment • Tier 2: Repositioning • Tier 3: Performance Improvement (validated by encounter-level evidence)</div>
     <div class="tabs" aria-label="Navigation tabs">
-      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Overview</button>
-      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Pillar Deep Dive</button>
-      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — LAI Pulse</button>
+      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Self-Assessment</button>
+      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Repositioning</button>
+      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — Performance Improvement</button>
     </div>
   </div>
 </header>
@@ -858,7 +828,7 @@
     if (view === "overview") updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     window.scrollTo({top:0, behavior:"smooth"});
   }
@@ -892,7 +862,7 @@
 
     const qs = TIER2_PROMPTS[p] || [];
     const formatted = qs.map((q,i)=>`${i+1}. ${q}`).join(" ");
-    setText("exec_prompts", formatted);(" "));
+    setText("exec_prompts", formatted);
 
     renderGauge("pillar_gauge", score, `${p} — Pillar Score`);
     renderPillarBreakdown("pillar_breakdown", p, metricScores);
@@ -947,7 +917,7 @@
     updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
   }
   function expandAll(){ document.querySelectorAll("#pillars details").forEach(d=>d.open=true); }
@@ -1494,12 +1464,12 @@
         updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
         populateFilterOptions(window.__lastEncounterRows || rows);
         renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
         runServiceLineComparison();
         showOk(`Tier 3 computed pillar KPIs from encounter-level evidence. Use the Tier 3 Drilldown & What‑If Simulator to unpack drivers. Toggle “Advanced Case Mode (D2)” to re-weight advanced maternal health encounters.`);
@@ -1556,7 +1526,7 @@
         updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
         showOk(`Tier 3 loaded pre-aggregated pillar metrics. If you want automatic computation, include an Encounter_Level_Data sheet.`);
         return;
@@ -1606,7 +1576,7 @@
       updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       showOk(`Tier 3 loaded pre-aggregated pillar metrics from CSV.`);
     }
@@ -1624,7 +1594,7 @@
     resetDefaults();
     renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     showOk(`Upload cleared. Back to Tier 1 proxy mode.`);
   }
@@ -1643,11 +1613,11 @@
       updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       showOk(`Advanced Case Mode ${document.getElementById("chk_advanced_mode").checked ? "ON" : "OFF"} — Tier 3 recomputed from encounter evidence.`);
     }
@@ -1717,7 +1687,7 @@
     sel.addEventListener("change", ()=>{
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     });
   }
@@ -1982,11 +1952,11 @@
     updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
   }
 
@@ -2023,12 +1993,12 @@
       updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     }
     renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     showOk("Simulation reset to baseline.");
   }
@@ -2049,11 +2019,11 @@
       updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       showOk("Simulation Mode OFF — showing computed baseline.");
     }
@@ -2133,7 +2103,7 @@
     updateAll();
     renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
   }
 
@@ -2340,7 +2310,7 @@
       updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
-      const ct=document.getElementById('tier3_compare_table');
+      var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     } catch(e){
       showErr(`Initialization error: <code>${String(e)}</code>`);
