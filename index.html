@@ -106,11 +106,11 @@
 <header>
   <div class="wrap" style="padding:0 18px;">
     <h1>Language Access Index (LAI) — 3-Tier Navigation Dashboard</h1>
-    <div class="sub">Tier 1: Preparedness proxy • Tier 2: Pillar drilldown • Tier 3: Performance validated from encounter-level evidence (optional Advanced Case Mode)</div>
+    <div class="sub">Tier 1: Self-Assessment • Tier 2: Repositioning • Tier 3: Performance Improvement (validated by encounter-level evidence)</div>
     <div class="tabs" aria-label="Navigation tabs">
-      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Overview</button>
-      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Pillar Deep Dive</button>
-      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — LAI Pulse</button>
+      <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Self-Assessment</button>
+      <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Repositioning</button>
+      <button class="tabbtn" id="tab_pulse" data-view="pulse">Tier 3 — Performance Improvement</button>
     </div>
   </div>
 </header>
@@ -132,7 +132,7 @@
           <span class="chip" id="mode_chip">Mode: Manual (Tier 1)</span>
         </div>
         <div class="small">
-          Tier 1 is a simplified preparedness proxy. Tier 3 can override Tier 1 using an encounter-level dataset (more precise).
+          Tier 1 is a structured self-assessment. Tier 3 can override Tier 1 using an encounter-level dataset (more precise).
         </div>
         <div id="pillars"></div>
       </div>
@@ -164,7 +164,7 @@
         <div style="margin-top:10px;" id="bar_overview"></div>
 
         <details>
-          <summary>Pillar KPI reference (Tier 1 proxy inputs)</summary>
+          <summary>Pillar KPI reference (Tier 1 self-assessment inputs)</summary>
           <div style="margin-top:10px;">
             <table id="kpi_table"></table>
           </div>
@@ -260,9 +260,76 @@
             <span id="upload_meta"></span>
           </div>
           <div class="small" style="margin-top:6px;">
-            <b>Computation:</b> <span id="compute_mode">Tier 1 proxy</span>
+            <b>Computation:</b> <span id="compute_mode">Tier 1 self-assessment</span>
           </div>
+        
+        <!-- Tier 3 drilldown & what-if simulator -->
+        <div class="card" style="box-shadow:none; margin-bottom:12px;">
+          <div style="font-weight:900; margin-bottom:6px;">Tier 3 Drilldown & What‑If Simulator</div>
+          <div class="small" style="margin-bottom:10px;">
+            Tier 3 is computed from the uploaded dataset. Use the drilldown to see how each pillar score is built from KPI components.
+            Use the simulator to model improvements (without changing the file) and observe how the LAI Pulse and stage would change.
+          </div>
+
+          <div class="inline" style="margin-bottom:8px;">
+            <span class="chip">
+              <input type="checkbox" id="chk_sim_mode" />
+              <label for="chk_sim_mode">Simulation Mode (apply improvements)</label>
+            </span>
+            <span class="chip" title="Resets simulation back to the computed baseline from the dataset.">
+              <button id="btn_sim_reset">Reset simulation</button>
+            </span>
+          </div>
+
+          <div class="grid grid-2" style="margin-top:8px;">
+            <div class="card" style="box-shadow:none;">
+              <div style="font-weight:900; margin-bottom:6px;">Pillar score table (computed vs simulated)</div>
+              <div class="small" id="tier3_table_note">Upload an encounter-level dataset to populate this table.</div>
+              <div style="overflow:auto; margin-top:8px;">
+                <table id="tier3_pillar_table"></table>
+              </div>
+            </div>
+
+            <div class="card" style="box-shadow:none;">
+              <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center;">
+                <div style="font-weight:900;">Selected pillar drilldown</div>
+                <select id="tier3_pillar_select" style="max-width:420px;"></select>
+              </div>
+              <div class="small" style="margin-top:6px;" id="tier3_pillar_context">—</div>
+
+              <div style="overflow:auto; margin-top:8px;">
+                <table id="tier3_component_table"></table>
+              <div style="margin-top:10px;">
+                <div style="font-weight:900; margin-bottom:6px;">Top 3 recommended actions for this pillar</div>
+                <div class="small" id="tier3_actions_note">Upload an encounter-level dataset to generate recommendations.</div>
+                <ol id="tier3_actions_list" class="small" style="margin:6px 0 0 18px; padding:0;"></ol>
+              </div>
+
+              </div>
+
+              <details style="margin-top:10px;">
+                <summary>Simulation controls for this pillar</summary>
+                <div class="small" style="margin-top:8px;">
+                  Adjust component completion rates (0–100). These model workflow/documentation improvements and recompute KPI1/KPI2 for the selected pillar.\n
+                </div>
+                <div class="row" id="tier3_sim_controls"></div>
+              </details>
+            </div>
+          </div>
+
+          <details style="margin-top:10px;">
+            <summary>How the simulator works</summary>
+            <div class="small" style="margin-top:8px;">
+              <ul style="margin:0; padding-left:18px;">
+                <li>Baseline values come from the uploaded dataset (<code>Encounter_Level_Data</code>).</li>
+                <li>Each pillar has 2 KPIs. Each KPI is built from 1–N components (e.g., timestamp integrity, touchpoint completeness, documentation sufficiency).</li>
+                <li>In Simulation Mode, component values you change replace the baseline components for that pillar only; all other pillars remain at baseline unless you adjust them too.</li>
+                <li>Stage gating still applies: if any pillar is below a stage threshold, the overall stage cannot advance.</li>
+              </ul>
+            </div>
+          </details>
         </div>
+</div>
 
         <div class="kpis">
           <div class="kpi">
@@ -391,7 +458,70 @@
   function clearErr(){ const e=document.getElementById("errbar"); e.style.display="none"; e.innerHTML = ""; }
   function showOk(msg){ const o=document.getElementById("okbar"); o.style.display="block"; o.innerHTML = msg; }
 
-  // ---- Tier 1 proxy schema (kept for continuity) ----
+  const TIER2_PROMPTS = {
+  "Access": [
+      "Where are access delays most concentrated (arrival, triage, consults, discharge), and what operational evidence supports that conclusion?",
+      "Which LEP encounter types lack timestamped interpreter engagement, and how does that gap distort reported wait-time performance?",
+      "Where does short-term supply mismatch occur (languages, modalities, hours), and which 30-day control would most reduce delays?",
+      "What minimum documentation threshold would verify interpreter access compliance ≥60 without increasing clinician burden?"
+  ],
+  "Patient Experience": [
+      "Where do LEP experience scores diverge most sharply from expectations, and which communication step is most implicated?",
+      "Which encounters lack documented comprehension confirmation (teach-back, repeat-back, visual aids)?",
+      "Which service line shows the highest experience variance despite similar interpreter availability—and why?",
+      "What single workflow change would most improve clarity without adding interpreter minutes?"
+  ],
+  "Outcomes": [
+      "Where do LEP patients fall out of the care pathway (prescriptions, referrals, follow-up visits, preventive services)?",
+      "Which outcome gaps are most plausibly driven by communication breakdowns versus access constraints?",
+      "Which outcome measure would improve fastest if comprehension reliability increased by 10–15%?",
+      "What is the lowest-effort evidence signal needed to link language access interventions to outcomes performance?"
+  ],
+  "Compliance": [
+      "Where is compliance weakest: policy presence, workflow execution, or documentation traceability?",
+      "Which required language-access touchpoints are most frequently undocumented despite services being delivered?",
+      "Which department presents the highest regulatory exposure due to inconsistent evidence standards?",
+      "What minimum audit-ready evidence package would reliably pass a spot review today?"
+  ],
+  "Patient Engagement": [
+      "At which moments are LEP patients least engaged (care planning, consent, discharge, self-management)?",
+      "Where is engagement assumed rather than verified, and what documentation would close that gap?",
+      "Which modality (video, visual aids, teach-back) would most increase engagement without increasing visit length?",
+      "What engagement metric would best predict downstream outcomes if measured consistently?"
+  ],
+  "Financial Stewardship": [
+      "Where does language access failure most directly translate into cost (readmissions, LOS, denials, malpractice risk)?",
+      "Which service line shows high interpreter utilization but low value capture?",
+      "Where is over-reliance on vendor services masking workforce or workflow inefficiencies?",
+      "What near-term intervention would most improve ROI visibility without financial system integration?"
+  ],
+  "Quality and Safety": [
+      "Which adverse events or near misses are most plausibly linked to communication failure?",
+      "Where are safety events documented without explicit language context?",
+      "Which clinical pathway carries the highest compounded risk from language gaps?",
+      "What single safety control would most reduce risk variance within one quarter?"
+  ],
+  "Workforce Development": [
+      "Where is evidence weakest: missing timestamps, missing touchpoints, or missing attestations?",
+      "Which staff groups are most often relied upon without verified proficiency or role clarity?",
+      "Which documentation element would most reduce rework and downstream task burden in the next 30 days?",
+      "What minimum evidence standard is needed to reliably meet the next maturity gate (≥60)?"
+  ],
+  "Workflow Optimization": [
+      "Where does language access fail silently due to handoff breakdowns?",
+      "Which workflows rely on individual heroics instead of standardized triggers?",
+      "Which unit shows the greatest variability in execution—and why?",
+      "What single workflow hard-stop would most improve consistency without slowing throughput?"
+  ],
+  "Technology Innovation": [
+      "Where is technology underutilized relative to need?",
+      "Which language-access data elements are generated but not captured or structured?",
+      "Which tools introduce friction instead of reducing it?",
+      "What is the smallest technical enhancement that would materially improve visibility and reliability?"
+  ],
+};
+
+  // ---- Tier 1 self-assessment schema (kept for continuity) ----
   const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
 
   // Pillars shown in dashboard
@@ -439,14 +569,24 @@
   // ---- Mode state ----
   let MODE = "manual";          // manual | upload
   let COMPUTE = "tier1_proxy";  // tier1_proxy | encounter_auto | pillar_agg
-  let uploadedRaw = null;       // {pillar: {m1, m2}} where m1/m2 are raw inputs or scores depending on COMPUTE
+  let uploadedRaw = null;       // {pillar: {m1, m2}} KPI scores (0-100) used by dashboard
   let uploadedMeta = {};
+
+  // Tier 3 baseline details (computed from encounter-level evidence)
+  let tier3Baseline = null;  // {pillarMetrics, pillarDetails, meta}
+  let tier3Sim = null;       // same shape as tier3Baseline, after applying simulated component edits
+  let simEdits = {};         // {pillar: {componentKey: value0to100}}
+  let SIM_MODE = false;      // whether simulation is applied
+
+  // Tier 3 filters and comparison state
+  let tier3Filter = {service_line: 'All', unit_id: 'All'};
+  let tier3Compare = {a: 'All', b: 'All'};
 
   function setMode(mode, computeModeLabel){
     MODE = mode;
     const label = (MODE === "upload") ? "Mode: Tier 3 Evidence" : "Mode: Manual (Tier 1)";
     ["mode_chip","mode_chip_2","mode_chip_3"].forEach(id=> setText(id, label));
-    setText("compute_mode", computeModeLabel || (MODE==="upload" ? "Tier 3 evidence" : "Tier 1 proxy"));
+    setText("compute_mode", computeModeLabel || (MODE==="upload" ? "Tier 3 evidence" : "Tier 1 self-assessment"));
     setManualEnabled(MODE !== "upload");
   }
   function setManualEnabled(enabled){
@@ -686,6 +826,10 @@
     if (view === "pillar") renderPillarView();
     if (view === "pulse") renderPulseView();
     if (view === "overview") updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     window.scrollTo({top:0, behavior:"smooth"});
   }
 
@@ -716,13 +860,9 @@
     if (!next) next = STAGES[STAGES.length-1];
     setText("pillar_gate", `≥${next.min}`);
 
-    const prompts=[
-      `Where is the evidence weakest in ${p}: missing timestamps, missing touchpoints, or missing attestations?`,
-      `Which documentation element would most reduce rework (attendant task burden) in the next 30 days?`,
-      `Which unit/service line is the outlier—and what control would reduce variance quickly?`,
-      `What is the minimum evidence standard needed to reliably meet the next gate (≥${next.min})?`
-    ];
-    setText("exec_prompts", prompts.join(" "));
+    const qs = TIER2_PROMPTS[p] || [];
+    const formatted = qs.map((q,i)=>`${i+1}. ${q}`).join(" ");
+    setText("exec_prompts", formatted);(" "));
 
     renderGauge("pillar_gauge", score, `${p} — Pillar Score`);
     renderPillarBreakdown("pillar_breakdown", p, metricScores);
@@ -775,6 +915,10 @@
       }
     }
     updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
   }
   function expandAll(){ document.querySelectorAll("#pillars details").forEach(d=>d.open=true); }
   function collapseAll(){ document.querySelectorAll("#pillars details").forEach(d=>d.open=false); }
@@ -1141,7 +1285,126 @@
       result["Technology Innovation"] = {m1:kpi1, m2:kpi2};
     }
 
-    return {pillarMetrics: result, meta:{n, reporting_period}};
+    // Build pillarDetails: store KPI values + component building blocks for drilldown & simulation
+    const pillarDetails = {};
+
+    // Helper to set detail
+    function setDetail(pillar, kpi1, kpi2, components1, components2){
+      pillarDetails[pillar] = {
+        kpi1: kpi1, kpi2: kpi2,
+        components: {
+          kpi1: components1 || [],
+          kpi2: components2 || []
+        }
+      };
+    }
+
+    // Populate details using the same intermediate quantities already computed above.
+    // Note: values stored as 0–100 (percent-like) except median_delay_minutes (minutes).
+    // Access
+    try{
+      const wA = weightsFor(rows,"Access");
+      // integrity
+      const integrityPct = (computeIntegrity(rows, wA) * 100);
+      // median delay
+      const delays=[]; const ww=[];
+      for (let i=0;i<rows.length;i++){
+        const r=rows[i];
+        if (yn(r["interpreter_requested"])!==1) continue;
+        const d=num(r["interpreter_delay_minutes"]);
+        if (d===null) continue;
+        delays.push(d); ww.push(wA[i]);
+      }
+      const med = weightedMedian(delays, ww);
+      const delayScore = delayScoreFromMedian(med);
+      const reqRel = weightedRate(rows.map(r=> (yn(r["interpreter_required"])===1 ? (yn(r["interpreter_requested"])===1 ? 1 : 0) : null)), wA) ?? 0;
+      setDetail("Access", result["Access"].m1, result["Access"].m2,
+        [
+          {key:"median_delay_minutes", label:"Median interpreter delay (minutes)", value: (med===null? null : med), unit:"min", type:"minutes"},
+          {key:"delay_score_band", label:"Delay score (banded mapping)", value: delayScore, unit:"/100", type:"score"},
+          {key:"timestamp_integrity_pct", label:"Timestamp integrity (request+start documented)", value: integrityPct, unit:"%", type:"percent"}
+        ],
+        [
+          {key:"request_reliability_pct", label:"Interpreter requested when required", value: reqRel, unit:"%", type:"percent"}
+        ]
+      );
+    } catch(e){}
+
+    // Patient Experience
+    setDetail("Patient Experience", result["Patient Experience"].m1, result["Patient Experience"].m2,
+      [{key:"explained_yes_pct", label:"Explained understandably (Yes)", value: result["Patient Experience"].m1, unit:"%", type:"percent"}],
+      [{key:"listened_yes_pct", label:"Listened (Yes)", value: result["Patient Experience"].m2, unit:"%", type:"percent"}]
+    );
+
+    // Outcomes
+    setDetail("Outcomes", result["Outcomes"].m1, result["Outcomes"].m2,
+      [{key:"preventive_completed_pct", label:"Preventive service completed", value: result["Outcomes"].m1, unit:"%", type:"percent"}],
+      [{key:"non_readmission_pct", label:"Not readmitted within 30 days", value: result["Outcomes"].m2, unit:"%", type:"percent"}]
+    );
+
+    // Compliance
+    setDetail("Compliance", result["Compliance"].m1, result["Compliance"].m2,
+      [
+        {key:"section_1557_pct", label:"Section 1557 documented", value: (weightedRate(rows.map(r=>yn(r["section_1557_documented"])), weightsFor(rows,"Compliance")) ?? 0), unit:"%", type:"percent"},
+        {key:"clinical_language_pct", label:"Clinical language documented", value: (weightedRate(rows.map(r=>yn(r["clinical_language_documented"])), weightsFor(rows,"Compliance")) ?? 0), unit:"%", type:"percent"},
+        {key:"timestamp_integrity_pct", label:"Timestamp integrity (request+start documented)", value: (computeIntegrity(rows, weightsFor(rows,"Compliance"))*100), unit:"%", type:"percent"}
+      ],
+      [
+        {key:"touchpoints_complete_pct", label:"Interpreter touchpoints complete (doc flag)", value: result["Compliance"].m2, unit:"%", type:"percent"}
+      ]
+    );
+
+    // Patient Engagement
+    setDetail("Patient Engagement", result["Patient Engagement"].m1, result["Patient Engagement"].m2,
+      [{key:"teachback_doc_pct", label:"Teach-back documented", value: result["Patient Engagement"].m1, unit:"%", type:"percent"}],
+      [{key:"discharge_concordance_pct", label:"Discharge language concordant", value: result["Patient Engagement"].m2, unit:"%", type:"percent"}]
+    );
+
+    // Financial Stewardship
+    setDetail("Financial Stewardship", result["Financial Stewardship"].m1, result["Financial Stewardship"].m2,
+      [{key:"non_avoidable_los_pct", label:"Not avoidable LOS", value: result["Financial Stewardship"].m1, unit:"%", type:"percent"}],
+      [
+        {key:"non_missed_reimb_pct", label:"No missed reimbursement opportunity", value: (100 - (weightedRate(rows.map(r=>yn(r["missed_reimbursement_opportunity"])), weightsFor(rows,"Financial Stewardship")) ?? 0)), unit:"%", type:"percent"},
+        {key:"rework_penalty_pct", label:"Rework penalty (from attendant_tasks_count)", value: (computeReworkPenalty(rows, weightsFor(rows,"Financial Stewardship"))*100), unit:"%", type:"percent"}
+      ]
+    );
+
+    // Quality and Safety
+    setDetail("Quality and Safety", result["Quality and Safety"].m1, result["Quality and Safety"].m2,
+      [{key:"non_adverse_event_pct", label:"No adverse event flag", value: result["Quality and Safety"].m1, unit:"%", type:"percent"}],
+      [{key:"safety_event_reported_pct", label:"Safety event reported", value: result["Quality and Safety"].m2, unit:"%", type:"percent"}]
+    );
+
+    // Workforce Development
+    setDetail("Workforce Development", result["Workforce Development"].m1, result["Workforce Development"].m2,
+      [{key:"training_current_pct", label:"Staff language-access training current", value: result["Workforce Development"].m1, unit:"%", type:"percent"}],
+      [
+        {key:"qbs_pct", label:"Provider QBS qualified", value: (weightedRate(rows.map(r=>yn(r["provider_qbs_qualified"])), weightsFor(rows,"Workforce Development")) ?? 0), unit:"%", type:"percent"},
+        {key:"language_match_pct", label:"Provider language matches patient", value: (weightedRate(rows.map(r=>yn(r["provider_language_matches_patient"])), weightsFor(rows,"Workforce Development")) ?? 0), unit:"%", type:"percent"}
+      ]
+    );
+
+    // Workflow Optimization
+    setDetail("Workflow Optimization", result["Workflow Optimization"].m1, result["Workflow Optimization"].m2,
+      [
+        {key:"touchpoint_coverage_pct", label:"Mean interpreter touchpoint coverage", value: result["Workflow Optimization"].m1, unit:"%", type:"percent"},
+        {key:"timestamp_integrity_pct", label:"Timestamp integrity (request+start documented)", value: (computeIntegrity(rows, weightsFor(rows,"Workflow Optimization"))*100), unit:"%", type:"percent"}
+      ],
+      [{key:"touchpoints_complete_pct", label:"Interpreter touchpoints complete (doc flag)", value: result["Workflow Optimization"].m2, unit:"%", type:"percent"}]
+    );
+
+    // Technology Innovation
+    setDetail("Technology Innovation", result["Technology Innovation"].m1, result["Technology Innovation"].m2,
+      [
+        {key:"tech_utilization_pct", label:"Tech utilization proxy (T1013 or VRI)", value: result["Technology Innovation"].m1, unit:"%", type:"percent"},
+      ],
+      [
+        {key:"documentation_maturity_pct", label:"Documentation maturity composite", value: (documentationMaturityComposite(rows, weightsFor(rows,"Technology Innovation"))), unit:"%", type:"percent"},
+        {key:"rework_penalty_pct", label:"Rework penalty (from attendant_tasks_count)", value: (computeReworkPenalty(rows, weightsFor(rows,"Technology Innovation"))*100), unit:"%", type:"percent"}
+      ]
+    );
+
+    return {pillarMetrics: result, pillarDetails: pillarDetails, meta:{n, reporting_period}};
   }
 
   // ---- Upload parsing ----
@@ -1178,10 +1441,13 @@
 
         // compute and load
         const computed = computeFromEncounterRows(rows);
+        tier3Baseline = computed;
+        tier3Sim = null;
+        simEdits = {};
         uploadedRaw = computed.pillarMetrics;
         uploadedMeta = {fileName:file.name, reporting_period: computed.meta.reporting_period, denominator_sum: computed.meta.n};
 
-        setMode("upload", "Tier 3 auto-compute from Encounter_Level_Data");
+        setMode("upload", "Tier 3 performance auto-compute from Encounter_Level_Data");
         setText("upload_status", `Loaded encounter-level dataset: ${file.name}`);
         setHTML("upload_meta", ` • Reporting period: <b>${uploadedMeta.reporting_period || "—"}</b> • Encounters: <b>${uploadedMeta.denominator_sum.toLocaleString()}</b>`);
         document.getElementById("btn_clear_upload").disabled = false;
@@ -1196,7 +1462,17 @@
         }
 
         updateAll();
-        showOk(`Tier 3 computed pillar KPIs from encounter-level evidence. Toggle “Advanced Case Mode (D2)” to re-weight advanced maternal health encounters.`);
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+        populateFilterOptions(window.__lastEncounterRows || rows);
+        renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+        runServiceLineComparison();
+        showOk(`Tier 3 performance computed pillar KPIs from encounter-level evidence. Use the Tier 3 Drilldown & What‑If Simulator to unpack drivers. Toggle “Advanced Case Mode (D2)” to re-weight advanced maternal health encounters.`);
         return;
       }
 
@@ -1237,6 +1513,9 @@
           showErr(`LAI_Pillar_Metrics parsed but missing pillars: <code>${missing.join(", ")}</code>.`);
           return;
         }
+        tier3Baseline = null;
+        tier3Sim = null;
+        simEdits = {};
         uploadedRaw = mapped;
         uploadedMeta = {fileName:file.name, reporting_period: rp, denominator_sum: denomSum || rows.length};
         setMode("upload", "Tier 3 using uploaded LAI_Pillar_Metrics");
@@ -1245,6 +1524,10 @@
         document.getElementById("btn_clear_upload").disabled = false;
         COMPUTE = "pillar_agg";
         updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
         showOk(`Tier 3 loaded pre-aggregated pillar metrics. If you want automatic computation, include an Encounter_Level_Data sheet.`);
         return;
       }
@@ -1277,6 +1560,12 @@
         showErr(`CSV parsed but missing pillars: <code>${missing.join(", ")}</code>.`);
         return;
       }
+      tier3Baseline = null;
+        tier3Sim = null;
+        simEdits = {};
+        tier3Baseline = null;
+      tier3Sim = null;
+      simEdits = {};
       uploadedRaw = mapped;
       uploadedMeta = {fileName:file.name};
       setMode("upload", "Tier 3 using uploaded pillar CSV");
@@ -1285,6 +1574,10 @@
       document.getElementById("btn_clear_upload").disabled = false;
       COMPUTE = "pillar_agg";
       updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       showOk(`Tier 3 loaded pre-aggregated pillar metrics from CSV.`);
     }
   }
@@ -1297,9 +1590,13 @@
     setText("upload_status", "No file loaded.");
     setHTML("upload_meta","");
     COMPUTE = "tier1_proxy";
-    setMode("manual", "Tier 1 proxy");
+    setMode("manual", "Tier 1 self-assessment");
     resetDefaults();
-    showOk(`Upload cleared. Back to Tier 1 proxy mode.`);
+    renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+    showOk(`Upload cleared. Back to Tier 1 self-assessment mode.`);
   }
 
   // When advanced mode toggles, recompute if encounter-level is active
@@ -1309,8 +1606,19 @@
     // To keep it interactive, we cache the last encounter rows in memory.
     if (window.__lastEncounterRows){
       const computed = computeFromEncounterRows(window.__lastEncounterRows);
-      uploadedRaw = computed.pillarMetrics;
+      tier3Baseline = computed;
+      // re-apply simulation edits if SIM_MODE
+      if (SIM_MODE) { applySimulation(); }
+      else { uploadedRaw = computed.pillarMetrics; }
       updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       showOk(`Advanced Case Mode ${document.getElementById("chk_advanced_mode").checked ? "ON" : "OFF"} — Tier 3 recomputed from encounter evidence.`);
     }
   }
@@ -1351,6 +1659,597 @@
     return _handleFile(file);
   }
 
+  
+  // ---- Tier 3 Drilldown & Simulator ----
+  function fmtVal(comp){
+    if (comp===null || comp===undefined) return "—";
+    if (typeof comp === "number"){
+      return Number.isFinite(comp) ? (Math.round(comp*10)/10).toString() : "—";
+    }
+    return String(comp);
+  }
+
+  function getActiveTier3(){
+    if (SIM_MODE && tier3Sim) return tier3Sim;
+    if (tier3Baseline) return tier3Baseline;
+    return null;
+  }
+
+  function ensureTier3Select(){
+    const sel = document.getElementById("tier3_pillar_select");
+    if (!sel) return;
+    if (sel.options.length) return;
+    PILLAR_ORDER.forEach(p=>{
+      const o=document.createElement("option");
+      o.value=p; o.textContent=p;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", ()=>{
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+    });
+  }
+
+  function buildPillarTable(active){
+    const tbl = document.getElementById("tier3_pillar_table");
+    if (!tbl) return;
+    const rows = [];
+    rows.push(`<tr>
+      <th>Pillar</th>
+      <th>KPI1</th>
+      <th>KPI2</th>
+      <th>Pillar score</th>
+      <th>Δ vs baseline</th>
+    </tr>`);
+
+    // Baseline pillar score for delta
+    const base = tier3Baseline ? tier3Baseline.pillarMetrics : null;
+
+    for (const p of PILLAR_ORDER){
+      const k1 = active?.pillarMetrics?.[p]?.m1;
+      const k2 = active?.pillarMetrics?.[p]?.m2;
+      const pscore = (k1===undefined||k2===undefined) ? null : clamp((METRICS[p].weights[0]*k1) + (METRICS[p].weights[1]*k2),0,100);
+      const baseScore = base ? clamp((METRICS[p].weights[0]*base[p].m1) + (METRICS[p].weights[1]*base[p].m2),0,100) : null;
+      const delta = (baseScore===null||pscore===null) ? null : (pscore - baseScore);
+      rows.push(`<tr>
+        <td><b>${p}</b></td>
+        <td>${pscore===null ? "—" : (k1.toFixed(0))}</td>
+        <td>${pscore===null ? "—" : (k2.toFixed(0))}</td>
+        <td>${pscore===null ? "—" : (pscore.toFixed(0))}</td>
+        <td>${delta===null ? "—" : (delta>=0? "+" : "") + delta.toFixed(0)}</td>
+      </tr>`);
+    }
+    tbl.innerHTML = rows.join("");
+  }
+
+  function componentTableForPillar(active, pillar){
+    const tbl = document.getElementById("tier3_component_table");
+    const ctx = document.getElementById("tier3_pillar_context");
+    if (!tbl || !ctx) return;
+
+    if (!active || !active.pillarDetails || !active.pillarDetails[pillar]){
+      ctx.textContent = "Upload an encounter-level dataset to see component-level drilldown for this pillar.";
+      tbl.innerHTML = "<tr><th>Component</th><th>Value</th></tr><tr><td colspan='2'>—</td></tr>";
+      document.getElementById("tier3_sim_controls").innerHTML = "";
+      return;
+    }
+
+    const det = active.pillarDetails[pillar];
+    ctx.textContent = `KPI1=${det.kpi1.toFixed(0)}/100, KPI2=${det.kpi2.toFixed(0)}/100. Components below show how Tier 3 derived those scores from the dataset.`;
+
+    const lines = [];
+    lines.push("<tr><th>Metric</th><th>Component</th><th>Value</th><th>Unit</th></tr>");
+    for (const comp of det.components.kpi1){
+      lines.push(`<tr><td><b>KPI1</b></td><td>${comp.label}</td><td>${fmtVal(comp.value)}</td><td>${comp.unit||""}</td></tr>`);
+    }
+    for (const comp of det.components.kpi2){
+      lines.push(`<tr><td><b>KPI2</b></td><td>${comp.label}</td><td>${fmtVal(comp.value)}</td><td>${comp.unit||""}</td></tr>`);
+    }
+    tbl.innerHTML = lines.join("");
+
+    buildSimControlsForPillar(pillar, det);
+  }
+
+  function buildSimControlsForPillar(pillar, det){
+    const wrap = document.getElementById("tier3_sim_controls");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+
+    // Build sliders for percent-like components that are meaningful levers.
+    // We do not expose minutes sliders everywhere; only for Access median delay.
+    const controls = [];
+
+    // Helper to add slider
+    function addSlider(key, label, baselineVal, min, max, step){
+      const cur = (simEdits[pillar] && simEdits[pillar][key]!==undefined) ? simEdits[pillar][key] : baselineVal;
+      const field = document.createElement("div");
+      field.className="field";
+      field.innerHTML = `
+        <label><span>${label}</span><span class="pill"><span id="sim_${slugify(pillar)}_${key}_val">${Math.round(cur)}</span></span></label>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${cur}" id="sim_${slugify(pillar)}_${key}"/>
+        <div class="help">Baseline: ${baselineVal===null||baselineVal===undefined ? "—" : Math.round(baselineVal)}.</div>
+      `;
+      field.querySelector("input").addEventListener("input", (e)=>{
+        const v = Number(e.target.value);
+        simEdits[pillar] = simEdits[pillar] || {};
+        simEdits[pillar][key] = v;
+        const lab = document.getElementById(`sim_${slugify(pillar)}_${key}_val`);
+        if (lab) lab.textContent = Math.round(v);
+        if (SIM_MODE) applySimulation();
+      });
+      wrap.appendChild(field);
+    }
+
+    // Access: allow improving median delay and timestamp integrity.
+    if (pillar === "Access"){
+      const comps = det.components.kpi1;
+      const med = comps.find(c=>c.key==="median_delay_minutes")?.value;
+      const integrity = comps.find(c=>c.key==="timestamp_integrity_pct")?.value;
+      if (med!==null && med!==undefined){
+        addSlider("median_delay_minutes", "Median interpreter delay (minutes) — simulate reduction", med, 0, 40, 1);
+      }
+      if (integrity!==null && integrity!==undefined){
+        addSlider("timestamp_integrity_pct", "Timestamp integrity (%) — request+start documented", integrity, 0, 100, 1);
+      }
+      const reqRel = det.components.kpi2.find(c=>c.key==="request_reliability_pct")?.value;
+      if (reqRel!==null && reqRel!==undefined){
+        addSlider("request_reliability_pct", "Interpreter requested when required (%)", reqRel, 0, 100, 1);
+      }
+      return;
+    }
+
+    // Compliance: allow improving 1557, clinical language, touchpoints complete, integrity
+    if (pillar === "Compliance"){
+      const k1 = det.components.kpi1;
+      const s1557 = k1.find(c=>c.key==="section_1557_pct")?.value;
+      const clin = k1.find(c=>c.key==="clinical_language_pct")?.value;
+      const integ = k1.find(c=>c.key==="timestamp_integrity_pct")?.value;
+      const tpc = det.components.kpi2.find(c=>c.key==="touchpoints_complete_pct")?.value;
+      if (s1557!==undefined) addSlider("section_1557_pct","Section 1557 documented (%)", s1557, 0, 100, 1);
+      if (clin!==undefined) addSlider("clinical_language_pct","Clinical language documented (%)", clin, 0, 100, 1);
+      if (integ!==undefined) addSlider("timestamp_integrity_pct","Timestamp integrity (%)", integ, 0, 100, 1);
+      if (tpc!==undefined) addSlider("touchpoints_complete_pct","Interpreter touchpoints complete (%)", tpc, 0, 100, 1);
+      return;
+    }
+
+    // Patient Engagement: teach-back + discharge concordance
+    if (pillar === "Patient Engagement"){
+      const tb = det.components.kpi1.find(c=>c.key==="teachback_doc_pct")?.value;
+      const dc = det.components.kpi2.find(c=>c.key==="discharge_concordance_pct")?.value;
+      if (tb!==undefined) addSlider("teachback_doc_pct","Teach-back documented (%)", tb, 0, 100, 1);
+      if (dc!==undefined) addSlider("discharge_concordance_pct","Discharge language concordance (%)", dc, 0, 100, 1);
+      return;
+    }
+
+    // Workflow Optimization: coverage + integrity + completeness
+    if (pillar === "Workflow Optimization"){
+      const cov = det.components.kpi1.find(c=>c.key==="touchpoint_coverage_pct")?.value;
+      const integ = det.components.kpi1.find(c=>c.key==="timestamp_integrity_pct")?.value;
+      const tpc = det.components.kpi2.find(c=>c.key==="touchpoints_complete_pct")?.value;
+      if (cov!==undefined) addSlider("touchpoint_coverage_pct","Mean touchpoint coverage (%)", cov, 0, 100, 1);
+      if (integ!==undefined) addSlider("timestamp_integrity_pct","Timestamp integrity (%)", integ, 0, 100, 1);
+      if (tpc!==undefined) addSlider("touchpoints_complete_pct","Touchpoints complete (doc flag) (%)", tpc, 0, 100, 1);
+      return;
+    }
+
+    // Technology Innovation: documentation maturity + rework penalty proxy (penalty slider is inverse of burden)
+    if (pillar === "Technology Innovation"){
+      const m = det.components.kpi2.find(c=>c.key==="documentation_maturity_pct")?.value;
+      const r = det.components.kpi2.find(c=>c.key==="rework_penalty_pct")?.value;
+      if (m!==undefined) addSlider("documentation_maturity_pct","Documentation maturity composite (%)", m, 0, 100, 1);
+      if (r!==undefined) addSlider("rework_penalty_pct","Rework penalty factor (%) — higher is better", r, 75, 100, 1);
+      return;
+    }
+
+    // Financial Stewardship: non-missed reimb + rework penalty
+    if (pillar === "Financial Stewardship"){
+      const nm = det.components.kpi2.find(c=>c.key==="non_missed_reimb_pct")?.value;
+      const rp = det.components.kpi2.find(c=>c.key==="rework_penalty_pct")?.value;
+      if (nm!==undefined) addSlider("non_missed_reimb_pct","No missed reimbursement opportunity (%)", nm, 0, 100, 1);
+      if (rp!==undefined) addSlider("rework_penalty_pct","Rework penalty factor (%) — higher is better", rp, 75, 100, 1);
+      return;
+    }
+
+    // Default: allow direct KPI nudges if desired
+    addSlider("kpi1_override","KPI1 override (score 0–100)", det.kpi1, 0, 100, 1);
+    addSlider("kpi2_override","KPI2 override (score 0–100)", det.kpi2, 0, 100, 1);
+  }
+
+  function applySimulation(){
+    // Create tier3Sim from tier3Baseline by applying simEdits to component values and recomputing KPIs for edited pillars.
+    if (!tier3Baseline) return;
+    const base = tier3Baseline;
+    const sim = JSON.parse(JSON.stringify(base)); // deep copy safe enough for numbers/objects
+
+    // Helper to recompute KPI from components for specific pillars
+    for (const pillar of Object.keys(simEdits)){
+      const edits = simEdits[pillar] || {};
+      if (!sim.pillarDetails || !sim.pillarDetails[pillar]) continue;
+      const det = sim.pillarDetails[pillar];
+
+      // Replace component values in detail tables (for display)
+      const replace = (arr)=>arr.map(c=>{
+        const k = c.key;
+        if (edits[k]!==undefined){
+          return Object.assign({}, c, {value: edits[k]});
+        }
+        return c;
+      });
+      det.components.kpi1 = replace(det.components.kpi1);
+      det.components.kpi2 = replace(det.components.kpi2);
+
+      // Now recompute KPI1/KPI2 for supported pillars using the same logic as v4, but on components.
+      // Access
+      if (pillar === "Access"){
+        const med = edits["median_delay_minutes"]!==undefined ? edits["median_delay_minutes"] : det.components.kpi1.find(c=>c.key==="median_delay_minutes")?.value;
+        const integ = edits["timestamp_integrity_pct"]!==undefined ? edits["timestamp_integrity_pct"] : det.components.kpi1.find(c=>c.key==="timestamp_integrity_pct")?.value;
+        const delayScore = delayScoreFromMedian(med);
+        const kpi1 = clamp(delayScore * (clamp(integ,0,100)/100), 0, 100);
+        const kpi2 = clamp(edits["request_reliability_pct"]!==undefined ? edits["request_reliability_pct"] : det.components.kpi2.find(c=>c.key==="request_reliability_pct")?.value, 0, 100);
+        det.kpi1 = kpi1; det.kpi2 = kpi2;
+        sim.pillarMetrics[pillar].m1 = kpi1;
+        sim.pillarMetrics[pillar].m2 = kpi2;
+      } else if (pillar === "Compliance"){
+        const s1557 = edits["section_1557_pct"]!==undefined ? edits["section_1557_pct"] : det.components.kpi1.find(c=>c.key==="section_1557_pct")?.value;
+        const clin = edits["clinical_language_pct"]!==undefined ? edits["clinical_language_pct"] : det.components.kpi1.find(c=>c.key==="clinical_language_pct")?.value;
+        const integ = edits["timestamp_integrity_pct"]!==undefined ? edits["timestamp_integrity_pct"] : det.components.kpi1.find(c=>c.key==="timestamp_integrity_pct")?.value;
+        const kpi1 = clamp((clamp(s1557,0,100)+clamp(clin,0,100)+clamp(integ,0,100))/3, 0, 100);
+        const kpi2 = clamp(edits["touchpoints_complete_pct"]!==undefined ? edits["touchpoints_complete_pct"] : det.components.kpi2.find(c=>c.key==="touchpoints_complete_pct")?.value, 0, 100);
+        det.kpi1 = kpi1; det.kpi2 = kpi2;
+        sim.pillarMetrics[pillar].m1 = kpi1;
+        sim.pillarMetrics[pillar].m2 = kpi2;
+      } else if (pillar === "Patient Engagement"){
+        const tb = edits["teachback_doc_pct"]!==undefined ? edits["teachback_doc_pct"] : det.components.kpi1.find(c=>c.key==="teachback_doc_pct")?.value;
+        const dc = edits["discharge_concordance_pct"]!==undefined ? edits["discharge_concordance_pct"] : det.components.kpi2.find(c=>c.key==="discharge_concordance_pct")?.value;
+        const kpi1 = clamp(tb,0,100);
+        const kpi2 = clamp(dc,0,100);
+        det.kpi1=kpi1; det.kpi2=kpi2;
+        sim.pillarMetrics[pillar].m1 = kpi1;
+        sim.pillarMetrics[pillar].m2 = kpi2;
+      } else if (pillar === "Workflow Optimization"){
+        const cov = edits["touchpoint_coverage_pct"]!==undefined ? edits["touchpoint_coverage_pct"] : det.components.kpi1.find(c=>c.key==="touchpoint_coverage_pct")?.value;
+        const integ = edits["timestamp_integrity_pct"]!==undefined ? edits["timestamp_integrity_pct"] : det.components.kpi1.find(c=>c.key==="timestamp_integrity_pct")?.value;
+        const kpi1 = clamp(clamp(cov,0,100) * (clamp(integ,0,100)/100), 0, 100);
+        const kpi2 = clamp(edits["touchpoints_complete_pct"]!==undefined ? edits["touchpoints_complete_pct"] : det.components.kpi2.find(c=>c.key==="touchpoints_complete_pct")?.value, 0, 100);
+        det.kpi1=kpi1; det.kpi2=kpi2;
+        sim.pillarMetrics[pillar].m1 = kpi1;
+        sim.pillarMetrics[pillar].m2 = kpi2;
+      } else if (pillar === "Technology Innovation"){
+        const kpi1 = det.kpi1; // leave as computed unless overridden
+        const m = edits["documentation_maturity_pct"]!==undefined ? edits["documentation_maturity_pct"] : det.components.kpi2.find(c=>c.key==="documentation_maturity_pct")?.value;
+        const rp = edits["rework_penalty_pct"]!==undefined ? edits["rework_penalty_pct"] : det.components.kpi2.find(c=>c.key==="rework_penalty_pct")?.value;
+        const kpi2 = clamp(clamp(m,0,100) * (clamp(rp,75,100)/100), 0, 100);
+        det.kpi2 = kpi2;
+        sim.pillarMetrics[pillar].m2 = kpi2;
+      } else if (pillar === "Financial Stewardship"){
+        const kpi1 = det.kpi1; // baseline already computed
+        const nm = edits["non_missed_reimb_pct"]!==undefined ? edits["non_missed_reimb_pct"] : det.components.kpi2.find(c=>c.key==="non_missed_reimb_pct")?.value;
+        const rp = edits["rework_penalty_pct"]!==undefined ? edits["rework_penalty_pct"] : det.components.kpi2.find(c=>c.key==="rework_penalty_pct")?.value;
+        const kpi2 = clamp(clamp(nm,0,100) * (clamp(rp,75,100)/100), 0, 100);
+        det.kpi2 = kpi2;
+        sim.pillarMetrics[pillar].m2 = kpi2;
+      } else {
+        // generic overrides if present
+        if (edits["kpi1_override"]!==undefined){
+          det.kpi1 = clamp(edits["kpi1_override"],0,100);
+          sim.pillarMetrics[pillar].m1 = det.kpi1;
+        }
+        if (edits["kpi2_override"]!==undefined){
+          det.kpi2 = clamp(edits["kpi2_override"],0,100);
+          sim.pillarMetrics[pillar].m2 = det.kpi2;
+        }
+      }
+    }
+
+    tier3Sim = sim;
+    if (SIM_MODE){
+      uploadedRaw = tier3Sim.pillarMetrics;
+    } else {
+      uploadedRaw = tier3Baseline.pillarMetrics;
+    }
+    updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+    renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+  }
+
+  function renderTier3Drilldown(){
+    ensureTier3Select();
+    const note = document.getElementById("tier3_table_note");
+    const active = getActiveTier3();
+
+    if (!note) return;
+
+    if (!active){
+      note.textContent = "Upload an encounter-level dataset to populate Tier 3 drilldown.";
+      const tbl = document.getElementById("tier3_pillar_table");
+      if (tbl) tbl.innerHTML = "<tr><th>Pillar</th><th>KPI1</th><th>KPI2</th><th>Pillar score</th><th>Δ vs baseline</th></tr><tr><td colspan='5'>—</td></tr>";
+      componentTableForPillar(null, "Access");
+      recommendActions(null, "Access");
+      return;
+    }
+
+    note.textContent = SIM_MODE ? "Showing SIMULATED scores (Simulation Mode ON)." : "Showing COMPUTED scores from dataset.";
+
+    buildPillarTable(active);
+    const sel = document.getElementById("tier3_pillar_select");
+    const pillar = sel ? (sel.value || "Access") : "Access";
+    componentTableForPillar(active, pillar);
+    recommendActions(active, pillar);
+  }
+
+  function resetSimulation(){
+    simEdits = {};
+    tier3Sim = null;
+    if (tier3Baseline && MODE==="upload" && COMPUTE==="encounter_auto"){
+      uploadedRaw = tier3Baseline.pillarMetrics;
+      updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+    }
+    renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+    showOk("Simulation reset to baseline.");
+  }
+
+  function onSimToggle(){
+    SIM_MODE = document.getElementById("chk_sim_mode").checked;
+    if (!tier3Baseline){
+      SIM_MODE = false;
+      document.getElementById("chk_sim_mode").checked = false;
+      showErr("Simulation requires an encounter-level upload (Encounter_Level_Data).");
+      return;
+    }
+    if (SIM_MODE){
+      applySimulation();
+      showOk("Simulation Mode ON — adjust component sliders to model improvements.");
+    } else {
+      uploadedRaw = tier3Baseline ? tier3Baseline.pillarMetrics : uploadedRaw;
+      updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+      showOk("Simulation Mode OFF — showing computed baseline.");
+    }
+  }
+
+
+  
+  // ---- Tier 3 Filters + Comparison + Action Recommendations ----
+  function uniq(arr){
+    return Array.from(new Set(arr.filter(x=>x!==null && x!==undefined && String(x).trim()!==''))).sort((a,b)=>String(a).localeCompare(String(b)));
+  }
+
+  function getField(row, name){
+    // tolerant access: tries exact, then case-insensitive key match once
+    if (row[name] !== undefined) return row[name];
+    const target = normKey(name);
+    const key = Object.keys(row).find(k=>normKey(k)===target);
+    return key ? row[key] : undefined;
+  }
+
+  function populateFilterOptions(rows){
+    const sl = uniq(rows.map(r=>String(getField(r,"service_line") ?? "").trim()).filter(s=>s));
+    const un = uniq(rows.map(r=>String(getField(r,"unit_id") ?? "").trim()).filter(s=>s));
+
+    const fltSL = document.getElementById("flt_service_line");
+    const fltU = document.getElementById("flt_unit_id");
+    const cmpA = document.getElementById("cmp_a");
+    const cmpB = document.getElementById("cmp_b");
+    if (!fltSL || !fltU || !cmpA || !cmpB) return;
+
+    function setSelect(sel, options, includeAll=true){
+      const prev = sel.value || "All";
+      sel.innerHTML = "";
+      if (includeAll){
+        const o=document.createElement("option"); o.value="All"; o.textContent="All";
+        sel.appendChild(o);
+      }
+      options.forEach(v=>{
+        const o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o);
+      });
+      // restore if exists
+      const has = Array.from(sel.options).some(o=>o.value===prev);
+      sel.value = has ? prev : (includeAll ? "All" : (options[0]||"All"));
+    }
+
+    setSelect(fltSL, sl, true);
+    setSelect(fltU, un, true);
+    setSelect(cmpA, ["All", ...sl].filter((v,i,a)=>a.indexOf(v)===i), false);
+    setSelect(cmpB, ["All", ...sl].filter((v,i,a)=>a.indexOf(v)===i), false);
+
+    // sensible defaults
+    if (cmpA.value === "All") cmpA.value = sl[0] || "All";
+    if (cmpB.value === "All") cmpB.value = sl[1] || sl[0] || "All";
+  }
+
+  function subsetRows(rows, serviceLine, unitId){
+    return rows.filter(r=>{
+      const sl = String(getField(r,"service_line") ?? "").trim();
+      const u = String(getField(r,"unit_id") ?? "").trim();
+      const okSL = (!serviceLine || serviceLine==="All") ? true : sl === serviceLine;
+      const okU  = (!unitId || unitId==="All") ? true : u === unitId;
+      return okSL && okU;
+    });
+  }
+
+  function recomputeTier3FromFilters(){
+    if (!window.__lastEncounterRows) return;
+    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id);
+    const computed = computeFromEncounterRows(rows);
+    tier3Baseline = computed;
+    tier3Sim = null;
+    simEdits = {};
+    uploadedRaw = computed.pillarMetrics;
+    setMode("upload", `Tier 3 performance auto-compute (filtered scope)`);
+    setText("upload_status", `Encounter-level dataset active (filtered)`);
+    setHTML("upload_meta", ` • Service line: <b>${tier3Filter.service_line}</b> • Unit: <b>${tier3Filter.unit_id}</b> • Encounters: <b>${rows.length.toLocaleString()}</b>`);
+    updateAll();
+    renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
+  }
+
+  function runServiceLineComparison(){
+    const tbl = document.getElementById("tier3_compare_table");
+    if (!tbl){
+      return;
+    }
+    if (!window.__lastEncounterRows){
+      tbl.innerHTML = "<tr><th>Comparison</th><th>Result</th></tr><tr><td colspan='2'>Upload an encounter-level dataset first.</td></tr>";
+      return;
+    }
+    const cmpA = document.getElementById("cmp_a")?.value || "All";
+    const cmpB = document.getElementById("cmp_b")?.value || "All";
+    tier3Compare = {a: cmpA, b: cmpB};
+
+    const rowsA = subsetRows(window.__lastEncounterRows, cmpA, tier3Filter.unit_id);
+    const rowsB = subsetRows(window.__lastEncounterRows, cmpB, tier3Filter.unit_id);
+    const compA = computeFromEncounterRows(rowsA);
+    const compB = computeFromEncounterRows(rowsB);
+
+    // Build table: pillar scores for A and B and delta
+    const lines = [];
+    lines.push(`<tr>
+      <th>Pillar</th>
+      <th>${cmpA} score</th>
+      <th>${cmpB} score</th>
+      <th>Δ (A−B)</th>
+    </tr>`);
+
+    for (const p of PILLAR_ORDER){
+      const a1 = compA.pillarMetrics[p].m1, a2 = compA.pillarMetrics[p].m2;
+      const b1 = compB.pillarMetrics[p].m1, b2 = compB.pillarMetrics[p].m2;
+      const aScore = clamp((METRICS[p].weights[0]*a1) + (METRICS[p].weights[1]*a2),0,100);
+      const bScore = clamp((METRICS[p].weights[0]*b1) + (METRICS[p].weights[1]*b2),0,100);
+      const d = aScore - bScore;
+      lines.push(`<tr>
+        <td><b>${p}</b></td>
+        <td>${aScore.toFixed(0)} <span class="small">(${rowsA.length})</span></td>
+        <td>${bScore.toFixed(0)} <span class="small">(${rowsB.length})</span></td>
+        <td>${(d>=0?"+":"") + d.toFixed(0)}</td>
+      </tr>`);
+    }
+
+    // Also show LAI pulse
+    const laiA = Object.values(compA.pillarMetrics).reduce((s,v,i)=> s + clamp((METRICS[PILLAR_ORDER[i]].weights[0]*v.m1)+(METRICS[PILLAR_ORDER[i]].weights[1]*v.m2),0,100),0) / PILLAR_ORDER.length;
+    const laiB = Object.values(compB.pillarMetrics).reduce((s,v,i)=> s + clamp((METRICS[PILLAR_ORDER[i]].weights[0]*v.m1)+(METRICS[PILLAR_ORDER[i]].weights[1]*v.m2),0,100),0) / PILLAR_ORDER.length;
+
+    lines.push(`<tr><td colspan="4" class="small"><b>LAI Pulse</b> — ${cmpA}: ${laiA.toFixed(0)} | ${cmpB}: ${laiB.toFixed(0)} (Unit filter: ${tier3Filter.unit_id})</td></tr>`);
+    tbl.innerHTML = lines.join("");
+  }
+
+  // Action recommendation library (component -> action suggestions)
+  const ACTION_LIBRARY = {
+    "Access": {
+      "median_delay_minutes": "Reduce interpreter delay: add an auto-trigger at registration/triage with an explicit SLA (e.g., ≤10 min) and escalation if not met.",
+      "timestamp_integrity_pct": "Improve measurement integrity: make interpreter request/start timestamps required fields (EHR hard fields or smart form).",
+      "request_reliability_pct": "Fix request reliability: require interpreter_required prompts at intake; audit ‘required but not requested’ encounters weekly for 30 days."
+    },
+    "Patient Experience": {
+      "explained_yes_pct": "Standardize ‘clear explanation’ behaviors: teach-back script + visual aids at the highest-risk decision points; reinforce in rounding.",
+      "listened_yes_pct": "Strengthen listening signals: introduce a 2-question ‘pause + confirm’ micro-protocol at triage and discharge with interpreter present."
+    },
+    "Outcomes": {
+      "preventive_completed_pct": "Close follow-through gaps: add automated reminders and interpreter-supported follow-up scheduling before discharge.",
+      "non_readmission_pct": "Target readmissions: prioritize teach-back + language-concordant discharge instructions for top 2 diagnoses driving returns."
+    },
+    "Compliance": {
+      "section_1557_pct": "Make 1557 evidence audit-ready: standardize notice/acknowledgment capture at registration and store in a reportable field.",
+      "clinical_language_pct": "Fix language traceability: enforce preferred language as required in demographics AND propagate to clinical note headers.",
+      "timestamp_integrity_pct": "Ensure interpreter request/start timestamps are captured automatically (system time-stamps) to avoid manual reconciliation.",
+      "touchpoints_complete_pct": "Add a discharge hard-stop: require touchpoint documentation completion before final discharge sign-off."
+    },
+    "Patient Engagement": {
+      "teachback_doc_pct": "Scale teach-back: implement a 60–90 second teach-back script and a single-click documentation field embedded in discharge workflow.",
+      "discharge_concordance_pct": "Improve discharge concordance: auto-generate discharge instructions in preferred language or route for rapid translation."
+    },
+    "Financial Stewardship": {
+      "non_missed_reimb_pct": "Reduce leakage: implement a coding-ready checklist for CCM/TCM/critical-care documentation and monitor weekly denials/holds.",
+      "rework_penalty_pct": "Lower rework burden: reduce coder/provider queries via completeness prompts and templated attestations (E/M, teaching, critical care)."
+    },
+    "Quality and Safety": {
+      "non_adverse_event_pct": "Add a high-risk communication control: interpreter + teach-back required for medication changes and consent-heavy decisions.",
+      "safety_event_reported_pct": "Improve detection: add a ‘language context’ field to safety reports and train staff to flag communication-related near misses."
+    },
+    "Workforce Development": {
+      "training_current_pct": "Raise competency: run a 30-day training sprint for high-volume units; require completion for scheduling in LEP-heavy areas.",
+      "qbs_pct": "Grow QBS capacity: identify top bilingual staff; enroll in QBS verification; redeploy to peak demand hours.",
+      "language_match_pct": "Deploy concordance intentionally: schedule language-concordant clinicians for the top 3 LEP languages in your service area."
+    },
+    "Workflow Optimization": {
+      "touchpoint_coverage_pct": "Standardize the 7-touchpoint workflow: embed interpreter/QBS prompts at each touchpoint (triage, H&P, diagnostics, vitals, follow-up, discharge planning, education).",
+      "timestamp_integrity_pct": "Eliminate ‘silent failures’: ensure request/start timestamps are auto-captured to reveal where workflow breaks.",
+      "touchpoints_complete_pct": "Reduce variability: add a workflow ‘hard-stop’ requiring touchpoint documentation completion for high-risk pathways."
+    },
+    "Technology Innovation": {
+      "documentation_maturity_pct": "Improve documentation maturity: deploy smart phrases/templates for E/M basis, MDM elements, critical care, and teaching attestations.",
+      "rework_penalty_pct": "Reduce friction: implement real-time completeness checks (EHR prompts) to prevent downstream follow-up tasks.",
+      "tech_utilization_pct": "Increase tech utilization: standardize VRI availability and default to VRI/audio where in-person is delayed; monitor adoption weekly."
+    }
+  };
+
+  function recommendActions(active, pillar){
+    const listEl = document.getElementById("tier3_actions_list");
+    const noteEl = document.getElementById("tier3_actions_note");
+    if (!listEl || !noteEl) return;
+    listEl.innerHTML = "";
+
+    if (!active || !active.pillarDetails || !active.pillarDetails[pillar]){
+      noteEl.textContent = "Upload an encounter-level dataset to generate recommendations.";
+      return;
+    }
+    noteEl.textContent = "Recommendations are generated from the lowest component values for this pillar.";
+
+    const det = active.pillarDetails[pillar];
+    const comps = [...(det.components.kpi1||[]), ...(det.components.kpi2||[])];
+    // Normalize to a 'low is bad' score for ranking
+    const scored = comps.map(c=>{
+      if (c.key === "median_delay_minutes"){
+        const delayScore = delayScoreFromMedian(c.value);
+        return {key:c.key, label:c.label, value: delayScore};
+      }
+      return {key:c.key, label:c.label, value: (typeof c.value==="number" ? c.value : null)};
+    }).filter(x=>x.value!==null && x.value!==undefined);
+
+    scored.sort((a,b)=>a.value-b.value);
+    const low3 = scored.slice(0,3);
+
+    const lib = ACTION_LIBRARY[pillar] || {};
+    const actions = [];
+    for (const c of low3){
+      if (lib[c.key]) actions.push(lib[c.key]);
+    }
+    // If not enough mapped actions, add generic hypothesis prompts
+    while (actions.length < 3){
+      actions.push(`Run a 30-day improvement test targeting the lowest component (${low3[0]?.label || "this pillar"}) and re-measure.`);
+    }
+
+    actions.slice(0,3).forEach(a=>{
+      const li=document.createElement("li");
+      li.textContent = a;
+      listEl.appendChild(li);
+    });
+  }
+
+
   // ---- Wire controls ----
   function wire(){
     document.querySelectorAll(".tabbtn").forEach(btn=> btn.addEventListener("click", ()=> setActiveView(btn.dataset.view)));
@@ -1370,6 +2269,26 @@
       if (f) handleFile(f);
     });
     document.getElementById("chk_advanced_mode").addEventListener("change", onAdvancedToggle);
+    document.getElementById("chk_sim_mode").addEventListener("change", onSimToggle);
+    document.getElementById("btn_sim_reset").addEventListener("click", resetSimulation);
+    document.getElementById("tier3_pillar_select").addEventListener("change", renderTier3Drilldown);
+    document.getElementById("btn_apply_filters").addEventListener("click", ()=>{
+      if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
+      tier3Filter.service_line = document.getElementById("flt_service_line").value || "All";
+      tier3Filter.unit_id = document.getElementById("flt_unit_id").value || "All";
+      recomputeTier3FromFilters();
+      runServiceLineComparison();
+    });
+    document.getElementById("btn_clear_filters").addEventListener("click", ()=>{
+      if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
+      tier3Filter = {service_line:"All", unit_id:"All"};
+      document.getElementById("flt_service_line").value = "All";
+      document.getElementById("flt_unit_id").value = "All";
+      recomputeTier3FromFilters();
+      runServiceLineComparison();
+    });
+    document.getElementById("btn_run_compare").addEventListener("click", runServiceLineComparison);
+
   }
 
   // ---- Init ----
@@ -1386,9 +2305,13 @@
       buildPillarSelect();
       buildKpiTable();
       wire();
-      setMode("manual", "Tier 1 proxy");
+      setMode("manual", "Tier 1 self-assessment");
       resetDefaults();
       updateAll();
+      renderTier3Drilldown();
+      runServiceLineComparison();
+      const ct=document.getElementById('tier3_compare_table');
+      if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     } catch(e){
       showErr(`Initialization error: <code>${String(e)}</code>`);
       console.error(e);
