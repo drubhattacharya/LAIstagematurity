@@ -132,7 +132,7 @@
           <span class="chip" id="mode_chip">Mode: Manual (Tier 1)</span>
         </div>
         <div class="small">
-          Tier 1 is a structured self-assessment. Tier 3 can override Tier 1 using an encounter-level dataset (more precise).
+          Tier 1 is a simplified preparedness proxy. Tier 3 can override Tier 1 using an encounter-level dataset (more precise).
         </div>
         <div id="pillars"></div>
       </div>
@@ -164,7 +164,7 @@
         <div style="margin-top:10px;" id="bar_overview"></div>
 
         <details>
-          <summary>Pillar KPI reference (Tier 1 self-assessment inputs)</summary>
+          <summary>Pillar KPI reference (Tier 1 proxy inputs)</summary>
           <div style="margin-top:10px;">
             <table id="kpi_table"></table>
           </div>
@@ -260,7 +260,7 @@
             <span id="upload_meta"></span>
           </div>
           <div class="small" style="margin-top:6px;">
-            <b>Computation:</b> <span id="compute_mode">Tier 1 self-assessment</span>
+            <b>Computation:</b> <span id="compute_mode">Tier 1 proxy</span>
           </div>
         
         <!-- Tier 3 drilldown & what-if simulator -->
@@ -521,7 +521,7 @@
   ],
 };
 
-  // ---- Tier 1 self-assessment schema (kept for continuity) ----
+  // ---- Tier 1 proxy schema (kept for continuity) ----
   const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
 
   // Pillars shown in dashboard
@@ -586,7 +586,7 @@
     MODE = mode;
     const label = (MODE === "upload") ? "Mode: Tier 3 Evidence" : "Mode: Manual (Tier 1)";
     ["mode_chip","mode_chip_2","mode_chip_3"].forEach(id=> setText(id, label));
-    setText("compute_mode", computeModeLabel || (MODE==="upload" ? "Tier 3 evidence" : "Tier 1 self-assessment"));
+    setText("compute_mode", computeModeLabel || (MODE==="upload" ? "Tier 3 evidence" : "Tier 1 proxy"));
     setManualEnabled(MODE !== "upload");
   }
   function setManualEnabled(enabled){
@@ -1447,7 +1447,7 @@
         uploadedRaw = computed.pillarMetrics;
         uploadedMeta = {fileName:file.name, reporting_period: computed.meta.reporting_period, denominator_sum: computed.meta.n};
 
-        setMode("upload", "Tier 3 performance auto-compute from Encounter_Level_Data");
+        setMode("upload", "Tier 3 auto-compute from Encounter_Level_Data");
         setText("upload_status", `Loaded encounter-level dataset: ${file.name}`);
         setHTML("upload_meta", ` • Reporting period: <b>${uploadedMeta.reporting_period || "—"}</b> • Encounters: <b>${uploadedMeta.denominator_sum.toLocaleString()}</b>`);
         document.getElementById("btn_clear_upload").disabled = false;
@@ -1472,7 +1472,7 @@
       const ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
         runServiceLineComparison();
-        showOk(`Tier 3 performance computed pillar KPIs from encounter-level evidence. Use the Tier 3 Drilldown & What‑If Simulator to unpack drivers. Toggle “Advanced Case Mode (D2)” to re-weight advanced maternal health encounters.`);
+        showOk(`Tier 3 computed pillar KPIs from encounter-level evidence. Use the Tier 3 Drilldown & What‑If Simulator to unpack drivers. Toggle “Advanced Case Mode (D2)” to re-weight advanced maternal health encounters.`);
         return;
       }
 
@@ -1590,13 +1590,13 @@
     setText("upload_status", "No file loaded.");
     setHTML("upload_meta","");
     COMPUTE = "tier1_proxy";
-    setMode("manual", "Tier 1 self-assessment");
+    setMode("manual", "Tier 1 proxy");
     resetDefaults();
     renderTier3Drilldown();
       runServiceLineComparison();
       const ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
-    showOk(`Upload cleared. Back to Tier 1 self-assessment mode.`);
+    showOk(`Upload cleared. Back to Tier 1 proxy mode.`);
   }
 
   // When advanced mode toggles, recompute if encounter-level is active
@@ -2097,7 +2097,7 @@
     tier3Sim = null;
     simEdits = {};
     uploadedRaw = computed.pillarMetrics;
-    setMode("upload", `Tier 3 performance auto-compute (filtered scope)`);
+    setMode("upload", `Tier 3 auto-compute (filtered scope)`);
     setText("upload_status", `Encounter-level dataset active (filtered)`);
     setHTML("upload_meta", ` • Service line: <b>${tier3Filter.service_line}</b> • Unit: <b>${tier3Filter.unit_id}</b> • Encounters: <b>${rows.length.toLocaleString()}</b>`);
     updateAll();
@@ -2305,7 +2305,7 @@
       buildPillarSelect();
       buildKpiTable();
       wire();
-      setMode("manual", "Tier 1 self-assessment");
+      setMode("manual", "Tier 1 proxy");
       resetDefaults();
       updateAll();
       renderTier3Drilldown();
