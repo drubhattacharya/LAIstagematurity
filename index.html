@@ -3,8 +3,13 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>LAI Dashboard — 3 Tiers (Overview • Pillar • Pulse)</title>
+  <title>LAI Dashboard — 3 Tiers (Overview • Pillar • Pulse • Upload)</title>
+
+  <!-- Plotly for charts -->
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <!-- SheetJS for Excel parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     :root{
       --blue:#1f7fd6; --green:#18a76f; --ink:#0b1f33; --muted:#2f4556;
@@ -54,12 +59,13 @@
     .good{color:var(--green); font-weight:900;}
     .warn{color:var(--warn); font-weight:900;}
     .bad{color:var(--bad); font-weight:900;}
-    .btnbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+    .btnbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; align-items:center;}
     button{
       border:1px solid var(--border); background:#fff; border-radius:12px;
       padding:8px 12px; font-weight:900; cursor:pointer;
     }
     button.primary{border-color:rgba(31,127,214,.35); background:rgba(31,127,214,.08);}
+    button.danger{border-color:rgba(217,59,59,.35); background:rgba(217,59,59,.08);}
     details{border:1px solid var(--border); border-radius:14px; padding:10px 12px; background:#fff; margin-top:10px;}
     summary{cursor:pointer; font-weight:900; color:var(--ink); list-style:none;}
     summary::-webkit-details-marker{display:none;}
@@ -86,6 +92,14 @@
     .okbar{display:none; border:1px solid rgba(24,167,111,.35); background:rgba(24,167,111,.08); color:var(--ink);
       border-radius:14px; padding:10px 12px; margin-top:12px;}
     code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .inline{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid var(--border); background:#fff;
+      font-size:12px; font-weight:900; color:var(--ink);
+    }
+    .chip input{width:auto; padding:0; margin:0;}
   </style>
 </head>
 
@@ -93,7 +107,7 @@
 <header>
   <div class="wrap" style="padding:0 18px;">
     <h1>Language Access Index (LAI) — 3-Tier Navigation Dashboard</h1>
-    <div class="sub">Tier 1: Overview • Tier 2: Pillar Deep Dive • Tier 3: LAI Pulse (readiness + maturity)</div>
+    <div class="sub">Tier 1: Overview • Tier 2: Pillar Deep Dive • Tier 3: LAI Pulse with Excel Upload</div>
     <div class="tabs" aria-label="Navigation tabs">
       <button class="tabbtn active" id="tab_overview" data-view="overview">Tier 1 — Overview</button>
       <button class="tabbtn" id="tab_pillar" data-view="pillar">Tier 2 — Pillar Deep Dive</button>
@@ -116,10 +130,10 @@
           <button id="btn_collapse">Collapse all pillars</button>
           <button id="btn_export_json">Export inputs (JSON)</button>
           <button id="btn_export_csv">Export scores (CSV)</button>
+          <span class="chip" id="mode_chip">Mode: Manual (Tier 1)</span>
         </div>
         <div class="small">
-          Adjust inputs below. Scores update instantly. Click any pillar title to open it, or click
-          <span class="mutedlink" id="jump_to_pillar">“Pillar Deep Dive”</span> to focus on one pillar.
+          Adjust inputs below. Scores update instantly. Tier 3 can optionally override these inputs via an uploaded Excel.
         </div>
         <div id="pillars"></div>
       </div>
@@ -167,6 +181,7 @@
         <div class="btnbar">
           <button class="primary" id="btn_back_overview_1">← Back to Overview</button>
           <button id="btn_go_pulse_1">Go to LAI Pulse →</button>
+          <span class="chip" id="mode_chip_2">Mode: Manual (Tier 1)</span>
         </div>
 
         <div class="split">
@@ -216,6 +231,33 @@
         <div class="btnbar">
           <button class="primary" id="btn_back_overview_2">← Back to Overview</button>
           <button id="btn_go_pillar_2">Go to Pillar Deep Dive →</button>
+          <span class="chip" id="mode_chip_3">Mode: Manual (Tier 1)</span>
+        </div>
+
+        <!-- Upload card -->
+        <div class="card" style="box-shadow:none; margin-bottom:12px;">
+          <div style="font-weight:900; margin-bottom:6px;">Upload Aggregated LAI Metrics (Excel)</div>
+          <div class="small" style="margin-bottom:10px;">
+            Upload an <b>.xlsx</b> (or <b>.csv</b>) containing a sheet named <code>LAI_Pillar_Metrics</code> with columns:
+            <code>pillar_name</code>, <code>metric_1_value</code>, <code>metric_2_value</code> (optional: <code>denominator</code>, <code>reporting_period</code>).
+            When active, the upload becomes the source of truth for Tier 3 (and locks Tier 1 controls).
+          </div>
+
+          <div class="inline">
+            <input id="file_input" type="file" accept=".xlsx,.xls,.csv" />
+            <button id="btn_download_template">Download template</button>
+            <button class="danger" id="btn_clear_upload" disabled>Clear upload</button>
+
+            <span class="chip">
+              <input type="checkbox" id="chk_values_scored" />
+              <label for="chk_values_scored">Uploaded values are already 0–100 scores</label>
+            </span>
+          </div>
+
+          <div class="small" style="margin-top:10px;">
+            <b>Status:</b> <span id="upload_status">No file loaded.</span>
+            <span id="upload_meta"></span>
+          </div>
         </div>
 
         <div class="kpis">
@@ -245,7 +287,7 @@
             <div style="font-weight:900; margin-bottom:6px;">Pulse gauge</div>
             <div id="gauge_pulse"></div>
             <div class="small" style="margin-top:8px;">
-              Tip: Your stage is determined by LAI thresholds AND “weakest-link” pillar constraints.
+              Tip: Stage is determined by LAI thresholds AND “weakest-link” pillar constraints.
             </div>
           </div>
 
@@ -260,8 +302,9 @@
           <div class="small" style="margin-top:8px;">
             <ul style="margin:0; padding-left:18px;">
               <li>LAI = average of the 10 pillar scores.</li>
-              <li>Each pillar = weighted average of two KPIs (weights shown in the KPI reference table).</li>
-              <li>Stage maturity uses LAI thresholds plus a “weakest-link gate”: a stage cannot be claimed unless all pillars meet the stage’s minimum threshold.</li>
+              <li>Each pillar = weighted average of two KPIs (weights shown in Tier 1 reference table).</li>
+              <li>Stage maturity uses LAI thresholds plus a “weakest-link gate.”</li>
+              <li>If “Uploaded values are already 0–100 scores” is checked, the file’s metric values are treated as scores (not re-scored).</li>
             </ul>
           </div>
         </details>
@@ -300,6 +343,7 @@
     return ["Low readiness","Higher risk","bad"];
   }
   function setText(id, txt){ const el=document.getElementById(id); if (el) el.textContent = txt; }
+  function setHTML(id, html){ const el=document.getElementById(id); if (el) el.innerHTML = html; }
   function setClass(id, cls){
     const el=document.getElementById(id);
     if (!el) return;
@@ -311,18 +355,50 @@
     e.style.display="block";
     e.innerHTML = msg;
   }
+  function clearErr(){
+    const e=document.getElementById("errbar");
+    e.style.display="none";
+    e.innerHTML = "";
+  }
   function showOk(msg){
     const o=document.getElementById("okbar");
     o.style.display="block";
     o.innerHTML = msg;
   }
 
-  // ---- LAI metric schema ----
+  // ---- LAI metric schema (2 KPIs per pillar) ----
   const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
+
   const PILLAR_ORDER = ["Access","Patient Experience","Outcomes","Compliance","Patient Engagement","Financial Stewardship","Quality and Safety","Workforce Development","Workflow Optimization","Technology Innovation"];
   const PILLAR_IDS = Object.fromEntries(PILLAR_ORDER.map(p=>[p, slugify(p)]));
 
-  // ---- Stage maturity model ----
+  // ---- Upload state ----
+  let MODE = "manual"; // manual | upload
+  // uploadedRaw[pillar] = {m1: value, m2: value, denominator?, reporting_period?}
+  let uploadedRaw = null;
+  let uploadedMeta = {fileName:null, reporting_period:null, denominator_sum:null};
+
+  function setMode(mode){
+    MODE = mode;
+    const label = (MODE === "upload") ? "Mode: Excel Upload (Tier 3)" : "Mode: Manual (Tier 1)";
+    ["mode_chip","mode_chip_2","mode_chip_3"].forEach(id=> setText(id, label));
+    setManualEnabled(MODE !== "upload");
+  }
+
+  function setManualEnabled(enabled){
+    // Enable/disable Tier 1 inputs (sliders/selects/number fields)
+    for (const p of PILLAR_ORDER){
+      for (const k of ["m1","m2"]){
+        const el = document.getElementById(idFor(p,k));
+        if (el) el.disabled = !enabled;
+      }
+    }
+    // Disable reset if upload mode (to avoid confusion)
+    const r = document.getElementById("btn_reset");
+    if (r) r.disabled = !enabled;
+  }
+
+  // ---- Stage maturity model (LAI threshold + weakest-link gate) ----
   const STAGES = [
     {name:"Stage 0", min:0,  label:"Unstable",          desc:"Reactive, inconsistent infrastructure; high variance by unit/service line."},
     {name:"Stage 1", min:40, label:"Foundational",      desc:"Core capabilities exist, but performance is uneven; basic standardization underway."},
@@ -354,7 +430,6 @@
 
   // ---- UI build ----
   const pillarsDiv = document.getElementById("pillars");
-
   function idFor(pillar, key){ return `${PILLAR_IDS[pillar]}__${key}`; }
 
   function makeField(pillar, key, spec){
@@ -461,13 +536,25 @@
     sel.addEventListener("change", renderPillarView);
   }
 
-  function getRaw(pillar, key, spec){
+  function getRawManual(pillar, key, spec){
     const el=document.getElementById(idFor(pillar, key));
     if (!el) return spec.default;
     if (spec.input === "band") return el.value;
     return Number(el.value);
   }
+
+  function getRaw(pillar, key, spec){
+    if (MODE === "upload" && uploadedRaw && uploadedRaw[pillar] && uploadedRaw[pillar][key] != null){
+      return uploadedRaw[pillar][key];
+    }
+    return getRawManual(pillar, key, spec);
+  }
+
   function scoreMetric(spec, raw){
+    if (document.getElementById("chk_values_scored")?.checked && MODE === "upload"){
+      // treat raw as already-scored 0–100
+      return clamp(Number(raw)||0, 0, 100);
+    }
     if (spec.input === "percent") return scorePercent(raw);
     if (spec.input === "band"){
       const map=new Map(spec.bands);
@@ -502,6 +589,7 @@
         m2:{raw:m2_raw, score:m2_score, spec:m2, weight:w[1]}
       };
 
+      // Update Tier 1 value text (still helpful even when disabled)
       const val1=document.getElementById(idFor(pillar,"m1")+"__val");
       const val2=document.getElementById(idFor(pillar,"m2")+"__val");
       if (val1){
@@ -632,20 +720,23 @@
     const {pillarScores, metricScores} = compute();
     const p = document.getElementById("pillar_select").value || PILLAR_ORDER[0];
 
-    // Show mirrored controls WITHOUT duplicating IDs: we render read-only cards reflecting current KPI scores.
     const wrap = document.getElementById("pillar_fields");
     wrap.innerHTML = "";
     const m1 = metricScores[p].m1, m2 = metricScores[p].m2;
+
     const f1 = document.createElement("div");
     f1.className="field";
     f1.innerHTML = `<label><span>${m1.spec.label}</span><span class="pill">${m1.spec.units||""}</span></label>
       <div class="small" style="margin-top:6px;"><b>Current value:</b> ${m1.raw} ${m1.spec.units||""} • <b>Score:</b> ${m1.score.toFixed(0)}/100</div>
-      <div class="help">Edit this KPI in Tier 1 (Overview) to change it.</div>`;
+      <div class="help">${MODE==="upload" ? "Driven by uploaded Excel." : "Driven by Tier 1 inputs."}</div>`;
+
     const f2 = document.createElement("div");
     f2.className="field";
+;
     f2.innerHTML = `<label><span>${m2.spec.label}</span><span class="pill">${m2.spec.units||""}</span></label>
       <div class="small" style="margin-top:6px;"><b>Current value:</b> ${m2.raw} ${m2.spec.units||""} • <b>Score:</b> ${m2.score.toFixed(0)}/100</div>
-      <div class="help">Edit this KPI in Tier 1 (Overview) to change it.</div>`;
+      <div class="help">${MODE==="upload" ? "Driven by uploaded Excel." : "Driven by Tier 1 inputs."}</div>`;
+
     wrap.appendChild(f1);
     wrap.appendChild(f2);
 
@@ -715,6 +806,7 @@
 
   // ---- Reset / Expand / Collapse ----
   function resetDefaults(){
+    if (MODE === "upload") return; // prevent confusion
     for (const p of PILLAR_ORDER){
       for (const k of ["m1","m2"]){
         const spec = METRICS[p][k];
@@ -761,10 +853,179 @@
     downloadText("lai_scores.csv", csv, "text/csv");
   }
 
+  // ---- Template download ----
+  function downloadTemplate(){
+    // CSV is simplest and works with Excel.
+    const header = ["pillar_name","metric_1_value","metric_2_value","denominator","reporting_period"];
+    const rp = "Q1 2026";
+    const rows = [header.join(",")];
+    for (const p of PILLAR_ORDER){
+      // Provide example values aligned to defaults (raw values, not scores)
+      const m1 = METRICS[p].m1.default;
+      const m2 = METRICS[p].m2.default;
+      const denom = 100;
+      rows.push([`"${p}"`,`"${m1}"`,`"${m2}"`,denom,`"${rp}"`].join(","));
+    }
+    downloadText("LAI_Pillar_Metrics_template.csv", rows.join("\n"), "text/csv");
+  }
+
+  // ---- Upload parsing ----
+  function normKey(k){ return String(k||"").trim().toLowerCase(); }
+  function canonPillar(name){
+    const n = String(name||"").trim().toLowerCase();
+    for (const p of PILLAR_ORDER){
+      if (p.toLowerCase() === n) return p;
+    }
+    // allow minor variations
+    if (n === "quality & safety" || n === "quality and safety") return "Quality and Safety";
+    if (n === "technology" || n === "tech innovation") return "Technology Innovation";
+    return null;
+  }
+
+  async function handleFile(file){
+    clearErr();
+    if (!file) return;
+    const ext = file.name.toLowerCase().split(".").pop();
+
+    // Parse into rows of objects: {pillar_name, metric_1_value, metric_2_value, denominator, reporting_period}
+    let rows = [];
+    try{
+      if (ext === "csv"){
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
+        const headers = lines[0].split(",").map(h=>h.replace(/^"|"$/g,"").trim());
+        for (let i=1;i<lines.length;i++){
+          const parts = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const obj = {};
+          headers.forEach((h,idx)=>{
+            const v = (parts[idx] ?? "").replace(/^"|"$/g,"").trim();
+            obj[h] = v;
+          });
+          rows.push(obj);
+        }
+      } else {
+        if (typeof XLSX === "undefined"){
+          throw new Error("XLSX library did not load.");
+        }
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, {type:"array"});
+        const sheetName = wb.SheetNames.find(n=>n.trim().toLowerCase() === "lai_pillar_metrics") || wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+      }
+    } catch(e){
+      showErr(`Could not parse file. Error: <code>${String(e)}</code>`);
+      return;
+    }
+
+    // Validate + map
+    const mapped = {};
+    let denomSum = 0;
+    let rp = null;
+
+    const required = ["pillar_name","metric_1_value","metric_2_value"];
+    // detect columns (case-insensitive)
+    const first = rows[0] || {};
+    const keys = Object.keys(first).map(k=>[normKey(k), k]);
+    function findCol(target){
+      const t = normKey(target);
+      const hit = keys.find(([nk,_])=>nk===t);
+      return hit ? hit[1] : null;
+    }
+    const colP = findCol("pillar_name");
+    const col1 = findCol("metric_1_value");
+    const col2 = findCol("metric_2_value");
+    const colD = findCol("denominator");
+    const colR = findCol("reporting_period");
+
+    if (!colP || !col1 || !col2){
+      showErr(`Missing required columns. Found: <code>${Object.keys(first).join(", ")}</code><br>
+        Required: <code>pillar_name</code>, <code>metric_1_value</code>, <code>metric_2_value</code>.`);
+      return;
+    }
+
+    for (const r of rows){
+      const p = canonPillar(r[colP]);
+      if (!p) continue;
+      const v1 = r[col1];
+      const v2 = r[col2];
+      // Keep as string if banded, else number
+      mapped[p] = {m1: v1, m2: v2};
+
+      if (colD){
+        const d = Number(r[colD]) || 0;
+        denomSum += d;
+      }
+      if (!rp && colR && String(r[colR]).trim().length>0){
+        rp = String(r[colR]).trim();
+      }
+    }
+
+    // ensure all pillars present
+    const missing = PILLAR_ORDER.filter(p=>!mapped[p]);
+    if (missing.length){
+      showErr(`File parsed, but missing pillars: <code>${missing.join(", ")}</code>. Please include all 10 pillars for a full LAI.`);
+      return;
+    }
+
+    // Coerce numeric fields when not banded
+    for (const p of PILLAR_ORDER){
+      for (const k of ["m1","m2"]){
+        const spec = METRICS[p][k];
+        let v = mapped[p][k];
+        if (spec.input === "band"){
+          // keep as-is string
+          mapped[p][k] = String(v).trim();
+        } else {
+          mapped[p][k] = Number(v);
+        }
+      }
+    }
+
+    uploadedRaw = mapped;
+    uploadedMeta = {fileName:file.name, reporting_period:rp, denominator_sum:(colD ? denomSum : null)};
+    setMode("upload");
+
+    // Update upload UI
+    setText("upload_status", `Loaded: ${file.name}`);
+    const metaBits = [];
+    if (rp) metaBits.push(`Reporting period: <b>${rp}</b>`);
+    if (colD) metaBits.push(`Denominator (sum): <b>${denomSum.toLocaleString()}</b>`);
+    setHTML("upload_meta", metaBits.length ? ` • ${metaBits.join(" • ")}` : "");
+    document.getElementById("btn_clear_upload").disabled = false;
+
+    // Sync Tier 1 controls to show uploaded values (read-only)
+    for (const p of PILLAR_ORDER){
+      for (const k of ["m1","m2"]){
+        const spec = METRICS[p][k];
+        const el = document.getElementById(idFor(p,k));
+        if (!el) continue;
+        const v = uploadedRaw[p][k];
+        if (spec.input === "band") el.value = v;
+        else el.value = v;
+      }
+    }
+
+    updateAll();
+    showOk(`Upload active. Tier 1 inputs are locked until you click “Clear upload.”`);
+  }
+
+  function clearUpload(){
+    uploadedRaw = null;
+    uploadedMeta = {fileName:null, reporting_period:null, denominator_sum:null};
+    document.getElementById("file_input").value = "";
+    document.getElementById("btn_clear_upload").disabled = true;
+    setText("upload_status", "No file loaded.");
+    setHTML("upload_meta","");
+    setMode("manual");
+    // restore defaults (and enable)
+    resetDefaults();
+    showOk(`Upload cleared. Back to manual mode.`);
+  }
+
   // ---- Wire controls ----
   function wire(){
     document.querySelectorAll(".tabbtn").forEach(btn=> btn.addEventListener("click", ()=> setActiveView(btn.dataset.view)));
-    document.getElementById("jump_to_pillar").addEventListener("click", ()=> setActiveView("pillar"));
 
     document.getElementById("btn_reset").addEventListener("click", resetDefaults);
     document.getElementById("btn_expand").addEventListener("click", expandAll);
@@ -776,21 +1037,39 @@
     document.getElementById("btn_go_pulse_1").addEventListener("click", ()=> setActiveView("pulse"));
     document.getElementById("btn_back_overview_2").addEventListener("click", ()=> setActiveView("overview"));
     document.getElementById("btn_go_pillar_2").addEventListener("click", ()=> setActiveView("pillar"));
+
+    document.getElementById("btn_download_template").addEventListener("click", downloadTemplate);
+    document.getElementById("btn_clear_upload").addEventListener("click", clearUpload);
+    document.getElementById("file_input").addEventListener("change", (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if (f) handleFile(f);
+    });
+
+    // If user toggles "values already scored", rerender quickly
+    document.getElementById("chk_values_scored").addEventListener("change", ()=>{
+      if (MODE === "upload") updateAll();
+    });
   }
 
+  // ---- Init ----
   function init(){
     try{
-      // Plotly check (will not block controls)
-      if (!canPlotly()){
-        showErr(`Plotly did not load. Charts will be disabled. If you need offline support, I can embed Plotly inside this HTML (larger file).`);
+      // Library checks
+      const plotlyOk = (typeof Plotly !== "undefined");
+      const xlsxOk = (typeof XLSX !== "undefined");
+      if (!plotlyOk){
+        showErr(`Plotly did not load. Charts will be disabled. If you need offline support, I can embed libraries inside this HTML (larger file).`);
+      } else if (!xlsxOk){
+        showErr(`Excel parsing library did not load. Upload may not work. If you need offline support, I can embed the parser library inside this HTML (larger file).`);
       } else {
-        showOk(`Dashboard loaded. If you only see the header on GitHub Pages, it usually means GitHub is serving a different file than your local copy (wrong branch/folder or not renamed to index.html).`);
+        showOk(`Dashboard loaded. Tip: On GitHub Pages, ensure this file is named <b>index.html</b> in the published folder.`);
       }
 
       buildPillars();
       buildPillarSelect();
       buildKpiTable();
       wire();
+      setMode("manual");
       resetDefaults();
       updateAll();
     } catch (e){
