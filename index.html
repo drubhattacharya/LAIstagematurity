@@ -81,6 +81,11 @@
     th{background:rgba(31,127,214,.08); text-align:left;}
     .callout{border:1px dashed rgba(11,31,51,.25); border-radius:14px; padding:10px 12px; background: rgba(255,255,255,.7);}
     .mutedlink{color: var(--muted); text-decoration: underline; cursor: pointer; font-weight: 900;}
+    .errbar{display:none; border:1px solid rgba(217,59,59,.35); background:rgba(217,59,59,.08); color:var(--ink);
+      border-radius:14px; padding:10px 12px; margin-top:12px;}
+    .okbar{display:none; border:1px solid rgba(24,167,111,.35); background:rgba(24,167,111,.08); color:var(--ink);
+      border-radius:14px; padding:10px 12px; margin-top:12px;}
+    code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
 </head>
 
@@ -98,6 +103,9 @@
 </header>
 
 <div class="wrap">
+  <div id="errbar" class="errbar"></div>
+  <div id="okbar" class="okbar"></div>
+
   <!-- OVERVIEW -->
   <section id="view_overview" class="view active">
     <div class="grid grid-2">
@@ -254,7 +262,6 @@
               <li>LAI = average of the 10 pillar scores.</li>
               <li>Each pillar = weighted average of two KPIs (weights shown in the KPI reference table).</li>
               <li>Stage maturity uses LAI thresholds plus a “weakest-link gate”: a stage cannot be claimed unless all pillars meet the stage’s minimum threshold.</li>
-              <li>This mirrors real-world maturity gating (capability requires consistent infrastructure across domains).</li>
             </ul>
           </div>
         </details>
@@ -264,11 +271,13 @@
 </div>
 
 <script>
-  // ---- LAI metric schema (2 KPIs per pillar) ----
-  const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
-  const PILLAR_ORDER = ["Access","Patient Experience","Outcomes","Compliance","Patient Engagement","Financial Stewardship","Quality and Safety","Workforce Development","Workflow Optimization","Technology Innovation"];
-
-  // ---- Scoring helpers ----
+  // ---- Helpers ----
+  function slugify(s){
+    return String(s).toLowerCase()
+      .replace(/&/g,"and")
+      .replace(/[^a-z0-9]+/g,"_")
+      .replace(/^_+|_+$/g,"");
+  }
   function clamp(x, lo=0, hi=100){ return Math.max(lo, Math.min(hi, x)); }
   function scorePercent(p){ return clamp(Number(p)||0,0,100); }
   function scoreGapAbs(g, bands){
@@ -290,8 +299,30 @@
     if (lai >= 60) return ["Moderate readiness","Moderate risk","warn"];
     return ["Low readiness","Higher risk","bad"];
   }
+  function setText(id, txt){ const el=document.getElementById(id); if (el) el.textContent = txt; }
+  function setClass(id, cls){
+    const el=document.getElementById(id);
+    if (!el) return;
+    el.classList.remove("good","warn","bad");
+    if (cls) el.classList.add(cls);
+  }
+  function showErr(msg){
+    const e=document.getElementById("errbar");
+    e.style.display="block";
+    e.innerHTML = msg;
+  }
+  function showOk(msg){
+    const o=document.getElementById("okbar");
+    o.style.display="block";
+    o.innerHTML = msg;
+  }
 
-  // ---- Stage maturity model (LAI threshold + weakest-link gate) ----
+  // ---- LAI metric schema ----
+  const METRICS = {"Access":{"m1":{"label":"% LEP patients who had <10 min wait time for interpreter/QBS in the Emergency Room","input":"band","units":"","bands":[["Under 10 min (ideal)",100],["10–15 min",80],["15–20 min",60],["20–25 min",40],[">25 min",20]],"default":"15–20 min"},"m2":{"label":"% alignment of physicians who speak non-English language(s) with LEP population in the geographic service area","input":"percent","units":"%","default":50},"weights":[0.6,0.4]},"Patient Experience":{"m1":{"label":"% HCAHPS differential among LEP and non-LEP pts in providers explaining things clearly","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":8},"m2":{"label":"% HCAHPS differential among LEP and non-LEP patients in patients understanding their treatment regimens","input":"gap_band","units":"pp","bands":[[2,100],[5,80],[10,60],[15,40],[1000000000,20]],"default":10},"weights":[0.5,0.5]},"Outcomes":{"m1":{"label":"% LEP patients who had prescriptions written and filled","input":"percent","units":"%","default":70},"m2":{"label":"% LEP patients who received recommended preventive services","input":"percent","units":"%","default":60},"weights":[0.5,0.5]},"Compliance":{"m1":{"label":"% LEP patients with interpreter access for touch-points requiring clinical engagement","input":"percent","units":"%","default":75},"m2":{"label":"% LEP encounters with documented interpreter/QBS use (excluding waivers)","input":"percent","units":"%","default":70},"weights":[0.5,0.5]},"Patient Engagement":{"m1":{"label":"% LEP patients who received teach-back","input":"percent","units":"%","default":40},"m2":{"label":"% LEP post-visit follow-up reached (auto + manual if needed)","input":"percent","units":"%","default":55},"weights":[0.5,0.5]},"Financial Stewardship":{"m1":{"label":"System cost savings from best practices (annual)","input":"dollars","units":"$","cap":5000000,"default":750000},"m2":{"label":"Hospital savings from reduced LOS among LEP patients (annual, per hospital)","input":"dollars","units":"$","cap":1500000,"default":250000},"weights":[0.55,0.45]},"Quality and Safety":{"m1":{"label":"30-day readmission rate for LEP patients","input":"band","units":"","bands":[["Under 10% (ideal)",100],["10–15%",80],["15–20%",60],["20–25%",40],[">25%",20]],"default":"15–20%"},"m2":{"label":"Gap in physical harm from adverse events (LEP vs non-LEP)","input":"gap_band","units":"pp","bands":[[0.5,100],[1.0,80],[2.0,60],[3.0,40],[1000000000,20]],"default":1.5},"weights":[0.55,0.45]},"Workforce Development":{"m1":{"label":"% staff trained in language access policy & preferred modality","input":"percent","units":"%","default":65},"m2":{"label":"% providers who are Qualified Bilingual Staff (QBS) or enrolled in QBS training","input":"percent","units":"%","default":20},"weights":[0.5,0.5]},"Workflow Optimization":{"m1":{"label":"% LEP touchpoints with documented interpreter/QBS use (7-touchpoint workflow)","input":"percent","units":"%","default":55},"m2":{"label":"Safety preparedness to minimize risk of harm for LEP patients (1–5)","input":"likert","units":"level","default":3},"weights":[0.55,0.45]},"Technology Innovation":{"m1":{"label":"% departments with tablets supporting VRI + audio interpreter modalities","input":"percent","units":"%","default":60},"m2":{"label":"% departments using tech-enabled documentation & automation (EMR doc, automated teach-back, etc.)","input":"percent","units":"%","default":45},"weights":[0.5,0.5]}};
+  const PILLAR_ORDER = ["Access","Patient Experience","Outcomes","Compliance","Patient Engagement","Financial Stewardship","Quality and Safety","Workforce Development","Workflow Optimization","Technology Innovation"];
+  const PILLAR_IDS = Object.fromEntries(PILLAR_ORDER.map(p=>[p, slugify(p)]));
+
+  // ---- Stage maturity model ----
   const STAGES = [
     {name:"Stage 0", min:0,  label:"Unstable",          desc:"Reactive, inconsistent infrastructure; high variance by unit/service line."},
     {name:"Stage 1", min:40, label:"Foundational",      desc:"Core capabilities exist, but performance is uneven; basic standardization underway."},
@@ -324,8 +355,10 @@
   // ---- UI build ----
   const pillarsDiv = document.getElementById("pillars");
 
+  function idFor(pillar, key){ return `${PILLAR_IDS[pillar]}__${key}`; }
+
   function makeField(pillar, key, spec){
-    const id = `${pillar}__${key}`;
+    const id = idFor(pillar, key);
     const field = document.createElement("div");
     field.className = "field";
 
@@ -404,7 +437,7 @@
       const d=document.createElement("details");
       d.open = (pillar === "Access");
       const s=document.createElement("summary");
-      s.innerHTML = `${pillar} <span class="small" id="score_${pillar}"></span>`;
+      s.innerHTML = `${pillar} <span class="small" id="score_${PILLAR_IDS[pillar]}"></span>`;
       d.appendChild(s);
 
       const row=document.createElement("div");
@@ -412,12 +445,6 @@
       row.appendChild(makeField(pillar,"m1",METRICS[pillar].m1));
       row.appendChild(makeField(pillar,"m2",METRICS[pillar].m2));
       d.appendChild(row);
-
-      s.addEventListener("click", ()=>{
-        setTimeout(()=>{
-          document.getElementById("pillar_select").value = pillar;
-        }, 0);
-      });
 
       pillarsDiv.appendChild(d);
     }
@@ -435,7 +462,7 @@
   }
 
   function getRaw(pillar, key, spec){
-    const el=document.getElementById(`${pillar}__${key}`);
+    const el=document.getElementById(idFor(pillar, key));
     if (!el) return spec.default;
     if (spec.input === "band") return el.value;
     return Number(el.value);
@@ -475,8 +502,8 @@
         m2:{raw:m2_raw, score:m2_score, spec:m2, weight:w[1]}
       };
 
-      const val1=document.getElementById(`${pillar}__m1__val`);
-      const val2=document.getElementById(`${pillar}__m2__val`);
+      const val1=document.getElementById(idFor(pillar,"m1")+"__val");
+      const val2=document.getElementById(idFor(pillar,"m2")+"__val");
       if (val1){
         val1.textContent = (m1.input === "band")
           ? `Selected: ${m1_raw} → score ${m1_score.toFixed(0)}/100`
@@ -487,7 +514,7 @@
           ? `Selected: ${m2_raw} → score ${m2_score.toFixed(0)}/100`
           : `Value: ${m2_raw} ${m2.units||""} → score ${m2_score.toFixed(0)}/100`;
       }
-      const sc=document.getElementById(`score_${pillar}`);
+      const sc=document.getElementById("score_"+PILLAR_IDS[pillar]);
       if (sc) sc.textContent = ` — ${pscore.toFixed(0)}/100`;
     }
 
@@ -495,12 +522,18 @@
     return {lai, pillarScores, metricScores};
   }
 
-  // ---- Charts ----
+  // ---- Charts (graceful if Plotly fails) ----
+  function canPlotly(){ return (typeof Plotly !== "undefined" && Plotly && Plotly.newPlot); }
+
   function renderGauge(divId, value, title){
+    const el = document.getElementById(divId);
+    if (!el) return;
+    if (!canPlotly()){
+      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load). Value: <b>${value.toFixed(0)}</b></div>`;
+      return;
+    }
     const data = [{
-      type: "indicator",
-      mode: "gauge+number",
-      value: value,
+      type: "indicator", mode: "gauge+number", value: value,
       title: { text: title, font: {size: 14} },
       gauge: { axis: { range: [0, 100] } }
     }];
@@ -509,11 +542,17 @@
   }
 
   function renderBar(divId, pillarScores){
+    const el = document.getElementById(divId);
+    if (!el) return;
+    if (!canPlotly()){
+      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load).</div>`;
+      return;
+    }
     const x = Object.keys(pillarScores);
     const y = x.map(k=>pillarScores[k]);
     const data=[{type:"bar", x:x, y:y}];
     const layout={
-      margin:{t:30,r:10,b:100,l:40},
+      margin:{t:30,r:10,b:110,l:40},
       height: 320,
       xaxis:{tickangle:-35},
       yaxis:{range:[0,100], title:"Score (0–100)"}
@@ -522,6 +561,12 @@
   }
 
   function renderPillarBreakdown(divId, pillar, metricScores){
+    const el = document.getElementById(divId);
+    if (!el) return;
+    if (!canPlotly()){
+      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load).</div>`;
+      return;
+    }
     const ms = metricScores[pillar];
     const labels = ["KPI 1","KPI 2"];
     const y = [ms.m1.score, ms.m2.score];
@@ -535,6 +580,12 @@
   }
 
   function renderHeatmap(divId, pillarScores){
+    const el = document.getElementById(divId);
+    if (!el) return;
+    if (!canPlotly()){
+      el.innerHTML = `<div class="small">Chart unavailable (Plotly did not load).</div>`;
+      return;
+    }
     const x = PILLAR_ORDER;
     const z = [x.map(p=>pillarScores[p])];
     const data=[{type:"heatmap", x:x, y:["Pillars"], z:z, zmin:0, zmax:100, showscale:true}];
@@ -542,21 +593,7 @@
     Plotly.newPlot(divId, data, layout, {displayModeBar:false, responsive:true});
   }
 
-  // ---- Text / KPIs ----
-  function setText(id, txt){ const el=document.getElementById(id); if (el) el.textContent = txt; }
-  function setClass(id, cls){
-    const el=document.getElementById(id);
-    if (!el) return;
-    el.classList.remove("good","warn","bad");
-    if (cls) el.classList.add(cls);
-  }
-
-  function topOpportunities(pillarScores, n=3){
-    const arr = Object.entries(pillarScores).sort((a,b)=>a[1]-b[1]);
-    return arr.slice(0,n);
-  }
-
-  // ---- KPI reference table ----
+  // ---- Reference table ----
   function buildKpiTable(){
     const tbl = document.getElementById("kpi_table");
     let html = "<tr><th>Pillar</th><th>KPI</th><th>Input type</th><th>Weight</th><th>Default</th></tr>";
@@ -578,51 +615,51 @@
     tbl.innerHTML = html;
   }
 
-  // ---- View switching ----
+  // ---- Views ----
   function setActiveView(view){
     document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
     document.getElementById("view_"+view).classList.add("active");
     document.querySelectorAll(".tabbtn").forEach(b=>b.classList.remove("active"));
     document.getElementById("tab_"+view).classList.add("active");
 
-    // Render appropriate charts (Plotly needs visible container for sizing)
     if (view === "pillar") renderPillarView();
     if (view === "pulse") renderPulseView();
     if (view === "overview") updateAll();
     window.scrollTo({top:0, behavior:"smooth"});
   }
 
-  // ---- Pillar view render ----
   function renderPillarView(){
-    const {lai, pillarScores, metricScores} = compute();
+    const {pillarScores, metricScores} = compute();
     const p = document.getElementById("pillar_select").value || PILLAR_ORDER[0];
 
-    // left fields
+    // Show mirrored controls WITHOUT duplicating IDs: we render read-only cards reflecting current KPI scores.
     const wrap = document.getElementById("pillar_fields");
     wrap.innerHTML = "";
-    wrap.appendChild(makeField(p,"m1",METRICS[p].m1));
-    wrap.appendChild(makeField(p,"m2",METRICS[p].m2));
-
-    // sync values from overview controls (so edits carry over)
-    ["m1","m2"].forEach(k=>{
-      const src = document.getElementById(`${p}__${k}`);
-      const dst = document.getElementById(`${p}__${k}`); // new element has same id, already
-      // nothing needed: id collision ensures a single element in DOM; we rebuilt fields, so copy from stored values
-    });
+    const m1 = metricScores[p].m1, m2 = metricScores[p].m2;
+    const f1 = document.createElement("div");
+    f1.className="field";
+    f1.innerHTML = `<label><span>${m1.spec.label}</span><span class="pill">${m1.spec.units||""}</span></label>
+      <div class="small" style="margin-top:6px;"><b>Current value:</b> ${m1.raw} ${m1.spec.units||""} • <b>Score:</b> ${m1.score.toFixed(0)}/100</div>
+      <div class="help">Edit this KPI in Tier 1 (Overview) to change it.</div>`;
+    const f2 = document.createElement("div");
+    f2.className="field";
+    f2.innerHTML = `<label><span>${m2.spec.label}</span><span class="pill">${m2.spec.units||""}</span></label>
+      <div class="small" style="margin-top:6px;"><b>Current value:</b> ${m2.raw} ${m2.spec.units||""} • <b>Score:</b> ${m2.score.toFixed(0)}/100</div>
+      <div class="help">Edit this KPI in Tier 1 (Overview) to change it.</div>`;
+    wrap.appendChild(f1);
+    wrap.appendChild(f2);
 
     const score = pillarScores[p];
     setText("pillar_score_value", score.toFixed(0));
-    const [rb, rsk, cls] = readinessBand(score);
+    const [rb, _, cls] = readinessBand(score);
     setText("pillar_score_band", rb);
     setClass("pillar_score_badge", cls);
     setText("pillar_score_badge", `${p}: ${score.toFixed(0)}/100`);
 
-    // nearest gate
     let next = STAGES.find(s=>score < s.min && s.min>0);
     if (!next) next = STAGES[STAGES.length-1];
     setText("pillar_gate", `≥${next.min}`);
 
-    // prompts
     const prompts = [
       `What is the single workflow failure mode most likely to explain the low KPI score(s) in ${p}?`,
       `Which unit/service line is the outlier—and what control would reduce variance within 30–60 days?`,
@@ -631,7 +668,6 @@
     ];
     setText("exec_prompts", prompts.join(" "));
 
-    // charts
     renderGauge("pillar_gauge", score, `${p} — Pillar Score`);
     renderPillarBreakdown("pillar_breakdown", p, metricScores);
   }
@@ -652,9 +688,13 @@
     renderHeatmap("heatmap_pulse", pillarScores);
   }
 
-  // ---- Overview update ----
+  function topOpportunities(pillarScores, n=3){
+    const arr = Object.entries(pillarScores).sort((a,b)=>a[1]-b[1]);
+    return arr.slice(0,n);
+  }
+
   function updateAll(){
-    const {lai, pillarScores, metricScores} = compute();
+    const {lai, pillarScores} = compute();
     const [rb, rsk, cls] = readinessBand(lai);
     const st = stageFrom(lai, pillarScores);
     const opp = topOpportunities(pillarScores, 3).map(([p,s])=>`${p} (${s.toFixed(0)})`).join(" • ");
@@ -669,7 +709,6 @@
     renderGauge("gauge_overview", lai, "LAI Pulse");
     renderBar("bar_overview", pillarScores);
 
-    // keep pillar view updated if visible
     if (document.getElementById("view_pillar").classList.contains("active")) renderPillarView();
     if (document.getElementById("view_pulse").classList.contains("active")) renderPulseView();
   }
@@ -679,22 +718,17 @@
     for (const p of PILLAR_ORDER){
       for (const k of ["m1","m2"]){
         const spec = METRICS[p][k];
-        const el = document.getElementById(`${p}__${k}`);
+        const el = document.getElementById(idFor(p,k));
         if (!el) continue;
-        if (spec.input === "band") el.value = spec.default;
-        else el.value = spec.default;
+        el.value = spec.default;
       }
     }
     updateAll();
   }
-  function expandAll(){
-    document.querySelectorAll("#pillars details").forEach(d=>d.open=true);
-  }
-  function collapseAll(){
-    document.querySelectorAll("#pillars details").forEach(d=>d.open=false);
-  }
+  function expandAll(){ document.querySelectorAll("#pillars details").forEach(d=>d.open=true); }
+  function collapseAll(){ document.querySelectorAll("#pillars details").forEach(d=>d.open=false); }
 
-  // ---- Exports ----
+  // ---- Downloads ----
   function downloadText(filename, text, mime="text/plain"){
     const blob = new Blob([text], {type:mime});
     const url = URL.createObjectURL(blob);
@@ -705,7 +739,6 @@
     a.remove();
     URL.revokeObjectURL(url);
   }
-
   function exportInputsJSON(){
     const inputs = {};
     for (const p of PILLAR_ORDER){
@@ -717,7 +750,6 @@
     }
     downloadText("lai_inputs.json", JSON.stringify(inputs, null, 2), "application/json");
   }
-
   function exportScoresCSV(){
     const {lai, pillarScores} = compute();
     let rows = [["Metric","Score"]];
@@ -729,29 +761,45 @@
     downloadText("lai_scores.csv", csv, "text/csv");
   }
 
-  // ---- Tab wiring ----
-  document.querySelectorAll(".tabbtn").forEach(btn=>{
-    btn.addEventListener("click", ()=> setActiveView(btn.dataset.view));
-  });
-  document.getElementById("jump_to_pillar").addEventListener("click", ()=> setActiveView("pillar"));
+  // ---- Wire controls ----
+  function wire(){
+    document.querySelectorAll(".tabbtn").forEach(btn=> btn.addEventListener("click", ()=> setActiveView(btn.dataset.view)));
+    document.getElementById("jump_to_pillar").addEventListener("click", ()=> setActiveView("pillar"));
 
-  document.getElementById("btn_reset").addEventListener("click", resetDefaults);
-  document.getElementById("btn_expand").addEventListener("click", expandAll);
-  document.getElementById("btn_collapse").addEventListener("click", collapseAll);
-  document.getElementById("btn_export_json").addEventListener("click", exportInputsJSON);
-  document.getElementById("btn_export_csv").addEventListener("click", exportScoresCSV);
+    document.getElementById("btn_reset").addEventListener("click", resetDefaults);
+    document.getElementById("btn_expand").addEventListener("click", expandAll);
+    document.getElementById("btn_collapse").addEventListener("click", collapseAll);
+    document.getElementById("btn_export_json").addEventListener("click", exportInputsJSON);
+    document.getElementById("btn_export_csv").addEventListener("click", exportScoresCSV);
 
-  document.getElementById("btn_back_overview_1").addEventListener("click", ()=> setActiveView("overview"));
-  document.getElementById("btn_go_pulse_1").addEventListener("click", ()=> setActiveView("pulse"));
-  document.getElementById("btn_back_overview_2").addEventListener("click", ()=> setActiveView("overview"));
-  document.getElementById("btn_go_pillar_2").addEventListener("click", ()=> setActiveView("pillar"));
+    document.getElementById("btn_back_overview_1").addEventListener("click", ()=> setActiveView("overview"));
+    document.getElementById("btn_go_pulse_1").addEventListener("click", ()=> setActiveView("pulse"));
+    document.getElementById("btn_back_overview_2").addEventListener("click", ()=> setActiveView("overview"));
+    document.getElementById("btn_go_pillar_2").addEventListener("click", ()=> setActiveView("pillar"));
+  }
 
-  // ---- Init ----
-  buildPillars();
-  buildPillarSelect();
-  buildKpiTable();
-  resetDefaults();
-  updateAll();
+  function init(){
+    try{
+      // Plotly check (will not block controls)
+      if (!canPlotly()){
+        showErr(`Plotly did not load. Charts will be disabled. If you need offline support, I can embed Plotly inside this HTML (larger file).`);
+      } else {
+        showOk(`Dashboard loaded. If you only see the header on GitHub Pages, it usually means GitHub is serving a different file than your local copy (wrong branch/folder or not renamed to index.html).`);
+      }
+
+      buildPillars();
+      buildPillarSelect();
+      buildKpiTable();
+      wire();
+      resetDefaults();
+      updateAll();
+    } catch (e){
+      showErr(`JavaScript error during initialization: <code>${String(e)}</code>. Open DevTools → Console for details.`);
+      console.error(e);
+    }
+  }
+
+  window.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
 </html>
