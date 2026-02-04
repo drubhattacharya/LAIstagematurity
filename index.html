@@ -272,7 +272,99 @@
           </div>
 
           <div class="inline" style="margin-bottom:8px;">
-            <span class="chip">
+            
+          <div class="small" style="margin-top:6px;">
+            <b>Scope filters:</b> compute Tier 3 from a subset of encounters (service line, unit, exemplar) to see performance by population/context.
+          </div>
+          <div class="inline" style="margin-top:8px;">
+            <span class="chip"><label for="flt_service_line">Service line</label>
+              <select id="flt_service_line" style="width:220px; margin-left:8px;"></select>
+            </span>
+            <span class="chip"><label for="flt_unit_id">Unit</label>
+              <select id="flt_unit_id" style="width:220px; margin-left:8px;"></select>
+            </span>
+            <span class="chip"><label for="flt_exemplar">Exemplar</label>
+              <select id="flt_exemplar" style="width:260px; margin-left:8px;"></select>
+            </span>
+            <button id="btn_apply_filters">Apply filters</button>
+            <button id="btn_clear_filters">Clear filters</button>
+          </div>
+
+          <div class="small" style="margin-top:10px;">
+            <b>Side-by-side comparison:</b> compare two service lines within the selected Unit/Exemplar scope.
+          </div>
+          <div class="inline" style="margin-top:8px;">
+            <span class="chip"><label for="cmp_a">Compare A</label>
+              <select id="cmp_a" style="width:220px; margin-left:8px;"></select>
+            </span>
+            <span class="chip"><label for="cmp_b">Compare B</label>
+              <select id="cmp_b" style="width:220px; margin-left:8px;"></select>
+            </span>
+            <button id="btn_run_compare">Run comparison</button>
+          </div>
+
+          <div style="overflow:auto; margin-top:8px;">
+            <table id="tier3_compare_table"></table>
+          </div>
+
+          <div class="card" style="box-shadow:none; margin-top:12px;">
+            <div style="font-weight:900; margin-bottom:6px;">Coding, Documentation & Revenue Risk Signals</div>
+            <div class="small" style="margin-bottom:10px;">
+              CPT/HCPCS documentation sufficiency indicators quantify exposure to <b>downcoding</b>, <b>claim holds/denials</b>, and <b>rework</b> from incomplete criteria.
+            </div>
+
+            <div class="grid grid-2" style="margin-top:8px;">
+              <div class="card" style="box-shadow:none;">
+                <div style="font-weight:900; margin-bottom:6px;">Risk summary</div>
+
+                <div class="small" style="margin-bottom:10px;">
+                  Educational revenue-at-risk estimator (assumptions-based): estimate potential revenue leakage from downcoding/holds when documentation criteria are incomplete.
+                </div>
+                <div class="inline" style="margin-bottom:10px;">
+                  <span class="chip"><label for="risk_amt_cc">Avg $ at risk per critical care (99291)</label>
+                    <input id="risk_amt_cc" type="number" value="250" style="width:120px; margin-left:8px;"/>
+                  </span>
+                  <span class="chip"><label for="risk_amt_teach">Avg $ at risk per GC/GE attestation</label>
+                    <input id="risk_amt_teach" type="number" value="60" style="width:120px; margin-left:8px;"/>
+                  </span>
+                  <span class="chip"><label for="risk_amt_ccm">Avg $ at risk per CCM</label>
+                    <input id="risk_amt_ccm" type="number" value="45" style="width:120px; margin-left:8px;"/>
+                  </span>
+                  <span class="chip"><label for="risk_amt_tcm">Avg $ at risk per TCM</label>
+                    <input id="risk_amt_tcm" type="number" value="90" style="width:120px; margin-left:8px;"/>
+                  </span>
+                  <button id="btn_recalc_risk">Recalc revenue-at-risk</button>
+                </div>
+
+                <div style="overflow:auto;">
+                  <table id="coding_risk_table"></table>
+                </div>
+                <div class="small" id="coding_risk_note" style="margin-top:8px;">Upload encounter-level data to populate.</div>
+
+                <div style="margin-top:10px;">
+                  <div style="font-weight:900; margin-bottom:6px;">Revenue-at-risk (educational estimate)</div>
+                  <div style="overflow:auto;">
+                    <table id="revenue_risk_table"></table>
+                  </div>
+                  <div class="small" id="revenue_risk_note" style="margin-top:8px;">
+                    Estimates use your chosen $ assumptions and the observed incompleteness rate in the filtered scope.
+                  </div>
+                </div>
+              </div>
+
+              <div class="card" style="box-shadow:none;">
+                <div style="font-weight:900; margin-bottom:6px;">Correlation signals (proxies)</div>
+                <div class="small" style="margin-bottom:8px;">
+                  Correlations use encounter-level proxies (not claims adjudication) to show how gaps relate to operational friction.
+                </div>
+                <div style="overflow:auto;">
+                  <table id="coding_corr_table"></table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+<span class="chip">
               <input type="checkbox" id="chk_sim_mode" />
               <label for="chk_sim_mode">Simulation Mode (apply improvements)</label>
             </span>
@@ -579,7 +671,7 @@
   let SIM_MODE = false;      // whether simulation is applied
 
   // Tier 3 filters and comparison state
-  let tier3Filter = {service_line: 'All', unit_id: 'All', exemplar: 'All'};
+  let tier3Filter = {service_line: 'All', unit_id: 'All'};
   let tier3Compare = {a: 'All', b: 'All'};
 
   function setMode(mode, computeModeLabel){
@@ -827,9 +919,8 @@
     if (view === "pulse") renderPulseView();
     if (view === "overview") updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
-      renderCodingRisk();
-        renderCodingRisk();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     window.scrollTo({top:0, behavior:"smooth"});
@@ -918,6 +1009,7 @@
     }
     updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1465,11 +1557,13 @@
 
         updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
         populateFilterOptions(window.__lastEncounterRows || rows);
         renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1527,6 +1621,7 @@
         COMPUTE = "pillar_agg";
         updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1577,6 +1672,7 @@
       COMPUTE = "pillar_agg";
       updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1595,6 +1691,7 @@
     setMode("manual", "Tier 1 proxy");
     resetDefaults();
     renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1614,10 +1711,12 @@
       else { uploadedRaw = computed.pillarMetrics; }
       updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1648,6 +1747,8 @@
         const ws = wb.Sheets[sheetEncounter[0]];
         const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
         window.__lastEncounterRows = rows;
+        try{ populateFilterOptions(rows); }catch(e){}
+
       } else {
         window.__lastEncounterRows = null;
       }
@@ -1688,6 +1789,7 @@
     });
     sel.addEventListener("change", ()=>{
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1953,10 +2055,12 @@
     }
     updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -1994,11 +2098,13 @@
       uploadedRaw = tier3Baseline.pillarMetrics;
       updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     }
     renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -2020,10 +2126,12 @@
       uploadedRaw = tier3Baseline ? tier3Baseline.pillarMetrics : uploadedRaw;
       updateAll();
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -2049,18 +2157,12 @@
   function populateFilterOptions(rows){
     const sl = uniq(rows.map(r=>String(getField(r,"service_line") ?? "").trim()).filter(s=>s));
     const un = uniq(rows.map(r=>String(getField(r,"unit_id") ?? "").trim()).filter(s=>s));
-    const ex = uniq(rows.map(r=>{
-      const a = String(getField(r,'exemplar_name') ?? '').trim();
-      const b = String(getField(r,'diagnosis_category') ?? '').trim();
-      return a || b;
-    }).filter(s=>s));
 
     const fltSL = document.getElementById("flt_service_line");
     const fltU = document.getElementById("flt_unit_id");
-    const fltE = document.getElementById("flt_exemplar");
     const cmpA = document.getElementById("cmp_a");
     const cmpB = document.getElementById("cmp_b");
-    if (!fltSL || !fltU || !fltE || !cmpA || !cmpB) return;
+    if (!fltSL || !fltU || !cmpA || !cmpB) return;
 
     function setSelect(sel, options, includeAll=true){
       const prev = sel.value || "All";
@@ -2079,7 +2181,6 @@
 
     setSelect(fltSL, sl, true);
     setSelect(fltU, un, true);
-    setSelect(fltE, ex, true);
     setSelect(cmpA, ["All", ...sl].filter((v,i,a)=>a.indexOf(v)===i), false);
     setSelect(cmpB, ["All", ...sl].filter((v,i,a)=>a.indexOf(v)===i), false);
 
@@ -2088,21 +2189,19 @@
     if (cmpB.value === "All") cmpB.value = sl[1] || sl[0] || "All";
   }
 
-  function subsetRows(rows, serviceLine, unitId, exemplar){
+  function subsetRows(rows, serviceLine, unitId){
     return rows.filter(r=>{
       const sl = String(getField(r,"service_line") ?? "").trim();
       const u = String(getField(r,"unit_id") ?? "").trim();
       const okSL = (!serviceLine || serviceLine==="All") ? true : sl === serviceLine;
       const okU  = (!unitId || unitId==="All") ? true : u === unitId;
-      const exv = (String(getField(r,'exemplar_name') ?? '').trim() || String(getField(r,'diagnosis_category') ?? '').trim());
-      const okE = (!exemplar || exemplar==="All") ? true : exv === exemplar;
-      return okSL && okU && okE;
+      return okSL && okU;
     });
   }
 
   function recomputeTier3FromFilters(){
     if (!window.__lastEncounterRows) return;
-    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id, tier3Filter.exemplar);
+    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id);
     const computed = computeFromEncounterRows(rows);
     tier3Baseline = computed;
     tier3Sim = null;
@@ -2113,6 +2212,7 @@
     setHTML("upload_meta", ` • Service line: <b>${tier3Filter.service_line}</b> • Unit: <b>${tier3Filter.unit_id}</b> • Encounters: <b>${rows.length.toLocaleString()}</b>`);
     updateAll();
     renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
@@ -2131,8 +2231,8 @@
     const cmpB = document.getElementById("cmp_b")?.value || "All";
     tier3Compare = {a: cmpA, b: cmpB};
 
-    const rowsA = subsetRows(window.__lastEncounterRows, cmpA, tier3Filter.unit_id, tier3Filter.exemplar);
-    const rowsB = subsetRows(window.__lastEncounterRows, cmpB, tier3Filter.unit_id, tier3Filter.exemplar);
+    const rowsA = subsetRows(window.__lastEncounterRows, cmpA, tier3Filter.unit_id);
+    const rowsB = subsetRows(window.__lastEncounterRows, cmpB, tier3Filter.unit_id);
     const compA = computeFromEncounterRows(rowsA);
     const compB = computeFromEncounterRows(rowsB);
 
@@ -2262,263 +2362,317 @@
 
 
   
-  // ---- Coding & Revenue Risk (Tier 3) ----
+  // ===== Tier 3 stratification + coding revenue risk additions (v18) =====
+  // Ensure filter state includes exemplar
+  try { tier3Filter.exemplar = tier3Filter.exemplar || 'All'; } catch(e) { tier3Filter = {service_line:'All', unit_id:'All', exemplar:'All'}; }
+
+  function uniq(arr){ return Array.from(new Set(arr.filter(x=>x!==null && x!==undefined && String(x).trim()!==''))).sort((a,b)=>String(a).localeCompare(String(b))); }
+
+  // Override populateFilterOptions to include exemplar (if original exists, this replaces it)
+  function populateFilterOptions(rows){
+    const sl = uniq(rows.map(r=>String(getField(r,'service_line') ?? '').trim()).filter(s=>s));
+    const un = uniq(rows.map(r=>String(getField(r,'unit_id') ?? '').trim()).filter(s=>s));
+    const ex = uniq(rows.map(r=>{
+      const a = String(getField(r,'exemplar_name') ?? '').trim();
+      const b = String(getField(r,'diagnosis_category') ?? '').trim();
+      return a || b;
+    }).filter(s=>s));
+
+    const fltSL = document.getElementById('flt_service_line');
+    const fltU  = document.getElementById('flt_unit_id');
+    const fltE  = document.getElementById('flt_exemplar');
+    const cmpA  = document.getElementById('cmp_a');
+    const cmpB  = document.getElementById('cmp_b');
+    if (!fltSL || !fltU || !fltE || !cmpA || !cmpB) return;
+
+    function setSelect(sel, options, includeAll=true){
+      const prev = sel.value || (includeAll?'All':'');
+      sel.innerHTML='';
+      if (includeAll){
+        const o=document.createElement('option'); o.value='All'; o.textContent='All'; sel.appendChild(o);
+      }
+      options.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+      const has = Array.from(sel.options).some(o=>o.value===prev);
+      sel.value = has ? prev : (includeAll?'All':(options[0]||''));
+    }
+
+    setSelect(fltSL, sl, true);
+    setSelect(fltU, un, true);
+    setSelect(fltE, ex, true);
+
+    cmpA.innerHTML=''; cmpB.innerHTML='';
+    ['All', ...sl].forEach(v=>{
+      const o1=document.createElement('option'); o1.value=v; o1.textContent=v;
+      const o2=o1.cloneNode(true);
+      cmpA.appendChild(o1); cmpB.appendChild(o2);
+    });
+    if (sl.length){
+      cmpA.value = sl[0];
+      cmpB.value = sl[1] || sl[0];
+    } else { cmpA.value='All'; cmpB.value='All'; }
+  }
+
+  // Extend subsetRows to include exemplar (wrap existing behavior)
+  function subsetRowsEx(rows, serviceLine, unitId, exemplar){
+    return rows.filter(r=>{
+      const sl = String(getField(r,'service_line') ?? '').trim();
+      const u  = String(getField(r,'unit_id') ?? '').trim();
+      const exv = (String(getField(r,'exemplar_name') ?? '').trim() || String(getField(r,'diagnosis_category') ?? '').trim());
+      const okSL = (!serviceLine || serviceLine==='All') ? true : sl===serviceLine;
+      const okU  = (!unitId || unitId==='All') ? true : u===unitId;
+      const okE  = (!exemplar || exemplar==='All') ? true : exv===exemplar;
+      return okSL && okU && okE;
+    });
+  }
+
+  // Replace recomputeTier3FromFilters to use exemplar
+  function recomputeTier3FromFilters(){
+    if (!window.__lastEncounterRows) return;
+    const rows = subsetRowsEx(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id, tier3Filter.exemplar);
+    const computed = computeFromEncounterRows(rows);
+    tier3Baseline = computed;
+    tier3Sim = null;
+    simEdits = {};
+    uploadedRaw = computed.pillarMetrics;
+    setMode('upload', 'Tier 3 performance auto-compute (filtered scope)');
+    setText('upload_status', 'Encounter-level dataset active (filtered)');
+    setHTML('upload_meta', ` • Service line: <b>${tier3Filter.service_line}</b> • Unit: <b>${tier3Filter.unit_id}</b> • Exemplar: <b>${tier3Filter.exemplar}</b> • Encounters: <b>${rows.length.toLocaleString()}</b>`);
+    updateAll();
+    renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
+    runServiceLineComparison();
+    renderCodingRisk();
+  }
+
+  function runServiceLineComparison(){
+    const tbl = document.getElementById('tier3_compare_table');
+    if (!tbl) return;
+    if (!window.__lastEncounterRows){
+      tbl.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset.</td></tr>";
+      return;
+    }
+    const cmpA = document.getElementById('cmp_a')?.value || 'All';
+    const cmpB = document.getElementById('cmp_b')?.value || 'All';
+    const rowsA = subsetRowsEx(window.__lastEncounterRows, cmpA, tier3Filter.unit_id, tier3Filter.exemplar);
+    const rowsB = subsetRowsEx(window.__lastEncounterRows, cmpB, tier3Filter.unit_id, tier3Filter.exemplar);
+    const compA = computeFromEncounterRows(rowsA);
+    const compB = computeFromEncounterRows(rowsB);
+
+    const lines=[];
+    lines.push(`<tr><th>Pillar</th><th>${cmpA} score</th><th>${cmpB} score</th><th>Δ (A−B)</th></tr>`);
+    for (const p of PILLAR_ORDER){
+      const aScore = clamp((METRICS[p].weights[0]*compA.pillarMetrics[p].m1) + (METRICS[p].weights[1]*compA.pillarMetrics[p].m2),0,100);
+      const bScore = clamp((METRICS[p].weights[0]*compB.pillarMetrics[p].m1) + (METRICS[p].weights[1]*compB.pillarMetrics[p].m2),0,100);
+      const d = aScore - bScore;
+      lines.push(`<tr><td><b>${p}</b></td><td>${aScore.toFixed(0)} <span class='small'>(${rowsA.length})</span></td><td>${bScore.toFixed(0)} <span class='small'>(${rowsB.length})</span></td><td>${(d>=0?'+':'')+d.toFixed(0)}</td></tr>`);
+    }
+    tbl.innerHTML = lines.join('');
+  }
+
   function pearson(xs, ys){
-    const pairs = [];
+    const pairs=[];
     for (let i=0;i<xs.length;i++){
       const x=xs[i], y=ys[i];
       if (x===null || y===null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
       pairs.push([x,y]);
     }
     if (pairs.length < 5) return null;
-    const n = pairs.length;
-    const mx = pairs.reduce((s,p)=>s+p[0],0)/n;
-    const my = pairs.reduce((s,p)=>s+p[1],0)/n;
-    let cov=0, vx=0, vy=0;
+    const n=pairs.length;
+    const mx=pairs.reduce((s,p)=>s+p[0],0)/n;
+    const my=pairs.reduce((s,p)=>s+p[1],0)/n;
+    let cov=0,vx=0,vy=0;
     for (const [x,y] of pairs){
       cov += (x-mx)*(y-my);
       vx  += (x-mx)*(x-mx);
       vy  += (y-my)*(y-my);
     }
-    if (vx<=0 || vy<=0) return null;
-    return cov / Math.sqrt(vx*vy);
+    if (vx<=0||vy<=0) return null;
+    return cov/Math.sqrt(vx*vy);
   }
 
-  function codingRiskMetrics(rows){
-    const ynf = (r, key)=> yn(getField(r,key));
-    const numf = (r, key)=> num(getField(r,key));
-
-    const docSupports = rows.map(r=>ynf(r,"doc_em_mdm_time_complete"));
-    const valid = docSupports.filter(v=>v!==null);
-    const docSupportsPct = valid.length ? 100*(valid.reduce((s,v)=>s+(v||0),0)/valid.length) : null;
-
-    let teachPct = null;
-    {
-      let sw=0, sx=0;
-      for (const r of rows){
-        if (!(ynf(r,"has_gc")===1 || ynf(r,"has_ge")===1)) continue;
-        sw += 1;
-        sx += (ynf(r,"doc_teaching_attestation_complete")===1) ? 1 : 0;
-      }
-      teachPct = sw>0 ? 100*(sx/sw) : null;
-    }
-
-    let critPct = null;
-    {
-      let sw=0, sx=0;
-      for (const r of rows){
-        if (ynf(r,"has_99291")!==1) continue;
-        sw += 1;
-        const ok = (ynf(r,"critical_care_met_definition_documented")===1 &&
-                    ynf(r,"critical_care_activities_documented")===1 &&
-                    numf(r,"critical_care_time_minutes_documented")!==null);
-        sx += ok ? 1 : 0;
-      }
-      critPct = sw>0 ? 100*(sx/sw) : null;
-    }
-
-    let ccmPct = null;
-    {
-      let sw=0, sx=0;
-      for (const r of rows){
-        if (ynf(r,"has_ccm")!==1) continue;
-        sw += 1;
-        const ok = (ynf(r,"ccm_patient_consent_documented")===1 &&
-                    ynf(r,"ccm_care_plan_documented")===1 &&
-                    numf(r,"ccm_time_minutes_documented")!==null);
-        sx += ok ? 1 : 0;
-      }
-      ccmPct = sw>0 ? 100*(sx/sw) : null;
-    }
-
-    let tcmPct = null;
-    {
-      let sw=0, sx=0;
-      for (const r of rows){
-        if (ynf(r,"has_tcm")!==1) continue;
-        sw += 1;
-        const ok = (ynf(r,"tcm_discharge_date_documented")===1 &&
-                    ynf(r,"tcm_interactive_contact_made")===1 &&
-                    ynf(r,"tcm_face_to_face_visit_completed")===1);
-        sx += ok ? 1 : 0;
-      }
-      tcmPct = sw>0 ? 100*(sx/sw) : null;
-    }
-
-    const riskSignals = [
-      {name:"E/M defensibility complete", goodPct: docSupportsPct, weight:2},
-      {name:"Teaching attestation complete (GC/GE)", goodPct: teachPct, weight:2},
-      {name:"Critical care docs sufficient (99291)", goodPct: critPct, weight:3},
-      {name:"CCM docs complete", goodPct: ccmPct, weight:3},
-      {name:"TCM docs complete", goodPct: tcmPct, weight:3},
-    ];
-
-    let sw=0, sx=0;
-    for (const s of riskSignals){
-      if (s.goodPct===null || s.goodPct===undefined) continue;
-      sw += s.weight;
-      sx += s.weight * (100 - clamp(s.goodPct,0,100));
-    }
-    const riskIndex = sw>0 ? (sx/sw) : null;
-
-    const tasks = rows.map(r=>numf(r,"attendant_tasks_count"));
-    const docIndex = rows.map(r=>{
-      const a=ynf(r,"doc_em_mdm_time_complete");
-      const b=ynf(r,"mdm_data_review_documents_present");
-      const c=ynf(r,"mdm_independent_interpretation_documented");
-      const d=ynf(r,"mdm_discussion_external_provider_documented");
-      const arr=[a,b,c,d].filter(v=>v!==null);
-      if (!arr.length) return null;
-      return 100*(arr.reduce((s,v)=>s+v,0)/arr.length);
-    });
-    const delay = rows.map(r=>numf(r,"interpreter_delay_minutes"));
-
-    const r1 = pearson(docIndex, tasks);
-    const r2 = pearson(delay, tasks);
-
-    return {riskSignals, riskIndex, corr:{doc_vs_rework:r1, delay_vs_rework:r2}};
-  }
-
-  
   function getRiskAssumptions(){
-    const a = (id, def)=>{
-      const el = document.getElementById(id);
-      const v = el ? Number(el.value) : def;
-      return Number.isFinite(v) ? v : def;
+    const a=(id,def)=>{
+      const el=document.getElementById(id);
+      const v=el?Number(el.value):def;
+      return Number.isFinite(v)?v:def;
     };
-    return { cc: a("risk_amt_cc", 250), teach: a("risk_amt_teach", 60), ccm: a("risk_amt_ccm", 45), tcm: a("risk_amt_tcm", 90) };
+    return {cc:a('risk_amt_cc',250), teach:a('risk_amt_teach',60), ccm:a('risk_amt_ccm',45), tcm:a('risk_amt_tcm',90)};
   }
 
   function renderRevenueAtRisk(rows){
-    const tbl = document.getElementById("revenue_risk_table");
-    const note = document.getElementById("revenue_risk_note");
+    const tbl=document.getElementById('revenue_risk_table');
+    const note=document.getElementById('revenue_risk_note');
     if (!tbl || !note) return;
-
     if (!rows || !rows.length){
       tbl.innerHTML = "<tr><th>Domain</th><th>Eligible</th><th>Incomplete</th><th>Incomplete rate</th><th>$/encounter</th><th>Est. $ at risk</th></tr><tr><td colspan='6'>—</td></tr>";
       return;
     }
+    const ynf=(r,k)=>yn(getField(r,k));
+    const numf=(r,k)=>num(getField(r,k));
+    const A=getRiskAssumptions();
+    const domains=[];
 
-    const ynf = (r, key)=> yn(getField(r,key));
-    const numf = (r, key)=> num(getField(r,key));
-    const A = getRiskAssumptions();
-
-    const domains = [];
-
-    // Critical care (99291)
-    {
-      let eligible=0, incomplete=0;
+    { let eligible=0,incomplete=0;
       for (const r of rows){
-        if (ynf(r,"has_99291")!==1) continue;
+        if (ynf(r,'has_99291')!==1) continue;
         eligible += 1;
-        const ok = (ynf(r,"critical_care_met_definition_documented")===1 &&
-                    ynf(r,"critical_care_activities_documented")===1 &&
-                    numf(r,"critical_care_time_minutes_documented")!==null);
+        const ok=(ynf(r,'critical_care_met_definition_documented')===1 && ynf(r,'critical_care_activities_documented')===1 && numf(r,'critical_care_time_minutes_documented')!==null);
         if (!ok) incomplete += 1;
       }
-      domains.push({name:"Critical care (99291) documentation", eligible, incomplete, amt:A.cc});
+      domains.push({name:'Critical care (99291) documentation', eligible, incomplete, amt:A.cc});
     }
-
-    // Teaching physician attestation (GC/GE)
-    {
-      let eligible=0, incomplete=0;
+    { let eligible=0,incomplete=0;
       for (const r of rows){
-        const elig = (ynf(r,"has_gc")===1 || ynf(r,"has_ge")===1);
+        const elig=(ynf(r,'has_gc')===1 || ynf(r,'has_ge')===1);
         if (!elig) continue;
         eligible += 1;
-        const ok = (ynf(r,"doc_teaching_attestation_complete")===1);
+        const ok=(ynf(r,'doc_teaching_attestation_complete')===1);
         if (!ok) incomplete += 1;
       }
-      domains.push({name:"Teaching physician attestation (GC/GE)", eligible, incomplete, amt:A.teach});
+      domains.push({name:'Teaching physician attestation (GC/GE)', eligible, incomplete, amt:A.teach});
     }
-
-    // CCM
-    {
-      let eligible=0, incomplete=0;
+    { let eligible=0,incomplete=0;
       for (const r of rows){
-        if (ynf(r,"has_ccm")!==1) continue;
+        if (ynf(r,'has_ccm')!==1) continue;
         eligible += 1;
-        const ok = (ynf(r,"ccm_patient_consent_documented")===1 &&
-                    ynf(r,"ccm_care_plan_documented")===1 &&
-                    numf(r,"ccm_time_minutes_documented")!==null);
+        const ok=(ynf(r,'ccm_patient_consent_documented')===1 && ynf(r,'ccm_care_plan_documented')===1 && numf(r,'ccm_time_minutes_documented')!==null);
         if (!ok) incomplete += 1;
       }
-      domains.push({name:"Chronic Care Management (CCM) completeness", eligible, incomplete, amt:A.ccm});
+      domains.push({name:'Chronic Care Management (CCM) completeness', eligible, incomplete, amt:A.ccm});
     }
-
-    // TCM
-    {
-      let eligible=0, incomplete=0;
+    { let eligible=0,incomplete=0;
       for (const r of rows){
-        if (ynf(r,"has_tcm")!==1) continue;
+        if (ynf(r,'has_tcm')!==1) continue;
         eligible += 1;
-        const ok = (ynf(r,"tcm_discharge_date_documented")===1 &&
-                    ynf(r,"tcm_interactive_contact_made")===1 &&
-                    ynf(r,"tcm_face_to_face_visit_completed")===1);
+        const ok=(ynf(r,'tcm_discharge_date_documented')===1 && ynf(r,'tcm_interactive_contact_made')===1 && ynf(r,'tcm_face_to_face_visit_completed')===1);
         if (!ok) incomplete += 1;
       }
-      domains.push({name:"Transitional Care Management (TCM) completeness", eligible, incomplete, amt:A.tcm});
+      domains.push({name:'Transitional Care Management (TCM) completeness', eligible, incomplete, amt:A.tcm});
     }
 
-    const lines = [];
+    const lines=[];
     lines.push("<tr><th>Domain</th><th>Eligible</th><th>Incomplete</th><th>Incomplete rate</th><th>$/encounter</th><th>Est. $ at risk</th></tr>");
     let total=0;
     for (const d of domains){
-      const rate = d.eligible>0 ? (d.incomplete/d.eligible) : 0;
-      const risk = d.incomplete * d.amt;
-      total += risk;
-      lines.push(`<tr>
-        <td><b>${d.name}</b></td>
-        <td>${d.eligible.toLocaleString()}</td>
-        <td>${d.incomplete.toLocaleString()}</td>
-        <td>${(rate*100).toFixed(0)}%</td>
-        <td>$${d.amt.toLocaleString()}</td>
-        <td>$${risk.toLocaleString()}</td>
-      </tr>`);
+      const rate=d.eligible>0?(d.incomplete/d.eligible):0;
+      const risk=d.incomplete*d.amt; total += risk;
+      lines.push(`<tr><td><b>${d.name}</b></td><td>${d.eligible.toLocaleString()}</td><td>${d.incomplete.toLocaleString()}</td><td>${(rate*100).toFixed(0)}%</td><td>$${d.amt.toLocaleString()}</td><td>$${risk.toLocaleString()}</td></tr>`);
     }
-    lines.push(`<tr><td colspan="6" class="small"><b>Total estimated revenue-at-risk</b>: $${total.toLocaleString()} (educational estimate)</td></tr>`);
-    tbl.innerHTML = lines.join("");
-    note.textContent = `Scope: ${rows.length.toLocaleString()} encounters (filters applied). Assumptions: CC=$${A.cc}, Teach=$${A.teach}, CCM=$${A.ccm}, TCM=$${A.tcm}.`;
+    lines.push(`<tr><td colspan='6' class='small'><b>Total estimated revenue-at-risk</b>: $${total.toLocaleString()} (educational estimate)</td></tr>`);
+    tbl.innerHTML = lines.join('');
+    note.textContent = `Scope: ${rows.length.toLocaleString()} encounters. Assumptions: CC=$${A.cc}, Teach=$${A.teach}, CCM=$${A.ccm}, TCM=$${A.tcm}.`;
   }
 
-function renderCodingRisk(){
-    const tbl = document.getElementById("coding_risk_table");
-    const corrTbl = document.getElementById("coding_corr_table");
-    const note = document.getElementById("coding_risk_note");
-    if (!tbl || !corrTbl || !note) return;
+  function codingRiskMetrics(rows){
+    const ynf=(r,k)=>yn(getField(r,k));
+    const numf=(r,k)=>num(getField(r,k));
+    const doc = rows.map(r=>ynf(r,'doc_em_mdm_time_complete')).filter(v=>v!==null);
+    const docPct = doc.length?100*(doc.reduce((s,v)=>s+(v||0),0)/doc.length):null;
+
+    let teachPct=null; { let sw=0,sx=0;
+      for (const r of rows){
+        if (!(ynf(r,'has_gc')===1 || ynf(r,'has_ge')===1)) continue;
+        sw += 1; sx += (ynf(r,'doc_teaching_attestation_complete')===1?1:0);
+      }
+      teachPct = sw>0?100*(sx/sw):null;
+    }
+    let ccPct=null; { let sw=0,sx=0;
+      for (const r of rows){
+        if (ynf(r,'has_99291')!==1) continue;
+        sw += 1;
+        const ok=(ynf(r,'critical_care_met_definition_documented')===1 && ynf(r,'critical_care_activities_documented')===1 && numf(r,'critical_care_time_minutes_documented')!==null);
+        sx += ok?1:0;
+      }
+      ccPct = sw>0?100*(sx/sw):null;
+    }
+    let ccmPct=null; { let sw=0,sx=0;
+      for (const r of rows){
+        if (ynf(r,'has_ccm')!==1) continue;
+        sw += 1;
+        const ok=(ynf(r,'ccm_patient_consent_documented')===1 && ynf(r,'ccm_care_plan_documented')===1 && numf(r,'ccm_time_minutes_documented')!==null);
+        sx += ok?1:0;
+      }
+      ccmPct = sw>0?100*(sx/sw):null;
+    }
+    let tcmPct=null; { let sw=0,sx=0;
+      for (const r of rows){
+        if (ynf(r,'has_tcm')!==1) continue;
+        sw += 1;
+        const ok=(ynf(r,'tcm_discharge_date_documented')===1 && ynf(r,'tcm_interactive_contact_made')===1 && ynf(r,'tcm_face_to_face_visit_completed')===1);
+        sx += ok?1:0;
+      }
+      tcmPct = sw>0?100*(sx/sw):null;
+    }
+
+    const riskSignals=[
+      {name:'E/M defensibility complete', goodPct:docPct, weight:2},
+      {name:'Teaching attestation complete (GC/GE)', goodPct:teachPct, weight:2},
+      {name:'Critical care docs sufficient (99291)', goodPct:ccPct, weight:3},
+      {name:'CCM docs complete', goodPct:ccmPct, weight:3},
+      {name:'TCM docs complete', goodPct:tcmPct, weight:3},
+    ];
+
+    let sw=0,sx=0;
+    for (const s of riskSignals){
+      if (s.goodPct===null) continue;
+      sw += s.weight;
+      sx += s.weight*(100-clamp(s.goodPct,0,100));
+    }
+    const riskIndex = sw>0? sx/sw : null;
+
+    const tasks = rows.map(r=>numf(r,'attendant_tasks_count'));
+    const docIndex = rows.map(r=>{
+      const a=ynf(r,'doc_em_mdm_time_complete');
+      const b=ynf(r,'mdm_data_review_documents_present');
+      const c=ynf(r,'mdm_independent_interpretation_documented');
+      const d=ynf(r,'mdm_discussion_external_provider_documented');
+      const arr=[a,b,c,d].filter(v=>v!==null);
+      if (!arr.length) return null;
+      return 100*(arr.reduce((s,v)=>s+v,0)/arr.length);
+    });
+    const delay = rows.map(r=>numf(r,'interpreter_delay_minutes'));
+    return {riskSignals, riskIndex, corr:{doc_vs_rework:pearson(docIndex,tasks), delay_vs_rework:pearson(delay,tasks)}};
+  }
+
+  function renderCodingRisk(){
+    const tbl=document.getElementById('coding_risk_table');
+    const corr=document.getElementById('coding_corr_table');
+    const note=document.getElementById('coding_risk_note');
+    if (!tbl || !corr || !note) return;
 
     if (!window.__lastEncounterRows){
       tbl.innerHTML = "<tr><th>Indicator</th><th>Value</th></tr><tr><td colspan='2'>Upload an encounter-level dataset.</td></tr>";
-      corrTbl.innerHTML = "<tr><th>Correlation</th><th>r</th></tr><tr><td colspan='2'>—</td></tr>";
-      note.textContent = "Upload encounter-level data to populate.";
+      corr.innerHTML = "<tr><th>Correlation</th><th>r</th></tr><tr><td colspan='2'>—</td></tr>";
+      note.textContent='Upload encounter-level data to populate.';
+      renderRevenueAtRisk([]);
       return;
     }
 
-    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id, tier3Filter.exemplar);
+    const rows = subsetRowsEx(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id, tier3Filter.exemplar);
     const m = codingRiskMetrics(rows);
 
-    const lines = [];
+    const lines=[];
     lines.push("<tr><th>Indicator</th><th>Good documentation rate</th><th>Risk (100-good)</th></tr>");
     for (const s of m.riskSignals){
-      if (s.goodPct===null || s.goodPct===undefined) continue;
+      if (s.goodPct===null) continue;
       lines.push(`<tr><td><b>${s.name}</b></td><td>${s.goodPct.toFixed(0)}%</td><td>${(100-s.goodPct).toFixed(0)}</td></tr>`);
     }
     if (m.riskIndex!==null){
-      lines.push(`<tr><td colspan="3" class="small"><b>Revenue Risk Index (0–100)</b>: ${m.riskIndex.toFixed(0)} (higher = more exposure)</td></tr>`);
+      lines.push(`<tr><td colspan='3' class='small'><b>Revenue Risk Index (0–100)</b>: ${m.riskIndex.toFixed(0)} (higher = more exposure)</td></tr>`);
     }
-    tbl.innerHTML = lines.join("");
+    tbl.innerHTML = lines.join('');
 
-    const c = m.corr;
-    const fmt = (r)=> (r===null ? "—" : (Math.round(r*100)/100).toFixed(2));
-    const clines = [];
-    clines.push("<tr><th>Correlation (proxy)</th><th>r</th><th>Interpretation</th></tr>");
-    clines.push(`<tr><td>Documentation completeness vs rework (attendant_tasks_count)</td><td>${fmt(c.doc_vs_rework)}</td><td class="small">${c.doc_vs_rework===null ? "—" : (c.doc_vs_rework<0 ? "Better documentation associated with less rework." : "Higher documentation associated with more rework (check workflow).")}</td></tr>`);
-    clines.push(`<tr><td>Interpreter delay vs rework (attendant_tasks_count)</td><td>${fmt(c.delay_vs_rework)}</td><td class="small">${c.delay_vs_rework===null ? "—" : (c.delay_vs_rework>0 ? "More delay associated with more rework." : "Less delay associated with more rework (check context).")}</td></tr>`);
-    corrTbl.innerHTML = clines.join("");
+    const fmt=(r)=> (r===null ? '—' : (Math.round(r*100)/100).toFixed(2));
+    const cl=[];
+    cl.push("<tr><th>Correlation (proxy)</th><th>r</th><th>Interpretation</th></tr>");
+    cl.push(`<tr><td>Documentation completeness vs rework</td><td>${fmt(m.corr.doc_vs_rework)}</td><td class='small'>${m.corr.doc_vs_rework===null?'—':(m.corr.doc_vs_rework<0?'Better documentation associated with less rework.':'Higher documentation associated with more rework (check workflow).')}</td></tr>`);
+    cl.push(`<tr><td>Interpreter delay vs rework</td><td>${fmt(m.corr.delay_vs_rework)}</td><td class='small'>${m.corr.delay_vs_rework===null?'—':(m.corr.delay_vs_rework>0?'More delay associated with more rework.':'Less delay associated with more rework (check context).')}</td></tr>`);
+    corr.innerHTML = cl.join('');
 
     note.textContent = `Computed on ${rows.length.toLocaleString()} encounters (filtered scope).`;
     renderRevenueAtRisk(rows);
   }
+  // ===== end v18 additions =====
 
 
   // ---- Wire controls ----
@@ -2541,6 +2695,32 @@ function renderCodingRisk(){
     });
     var el_chk_advanced_mode = document.getElementById("chk_advanced_mode");
     if (el_chk_advanced_mode) el_chk_advanced_mode.addEventListener("change", onAdvancedToggle);
+
+    var el_btn_apply_filters = document.getElementById("btn_apply_filters");
+    if (el_btn_apply_filters) el_btn_apply_filters.addEventListener("click", ()=>{
+      if(!window.__lastEncounterRows){ showErr("Upload an encounter-level dataset first."); return; }
+      tier3Filter.service_line = document.getElementById("flt_service_line").value || "All";
+      tier3Filter.unit_id = document.getElementById("flt_unit_id").value || "All";
+      tier3Filter.exemplar = document.getElementById("flt_exemplar").value || "All";
+      recomputeTier3FromFilters();
+    });
+
+    var el_btn_clear_filters = document.getElementById("btn_clear_filters");
+    if (el_btn_clear_filters) el_btn_clear_filters.addEventListener("click", ()=>{
+      if(!window.__lastEncounterRows){ showErr("Upload an encounter-level dataset first."); return; }
+      tier3Filter = {service_line:"All", unit_id:"All", exemplar:"All"};
+      document.getElementById("flt_service_line").value = "All";
+      document.getElementById("flt_unit_id").value = "All";
+      document.getElementById("flt_exemplar").value = "All";
+      recomputeTier3FromFilters();
+    });
+
+    var el_btn_run_compare2 = document.getElementById("btn_run_compare");
+    if (el_btn_run_compare2) el_btn_run_compare2.addEventListener("click", ()=>{ runServiceLineComparison(); renderCodingRisk(); });
+
+    var el_btn_recalc_risk = document.getElementById("btn_recalc_risk");
+    if (el_btn_recalc_risk) el_btn_recalc_risk.addEventListener("click", ()=>{ renderCodingRisk(); });
+
     var el_chk_sim_mode = document.getElementById("chk_sim_mode");
     if (el_chk_sim_mode) el_chk_sim_mode.addEventListener("change", onSimToggle);
     var el_btn_sim_reset = document.getElementById("btn_sim_reset");
@@ -2552,21 +2732,17 @@ function renderCodingRisk(){
       if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
       tier3Filter.service_line = document.getElementById("flt_service_line").value || "All";
       tier3Filter.unit_id = document.getElementById("flt_unit_id").value || "All";
-      tier3Filter.exemplar = (document.getElementById("flt_exemplar")?.value) || "All";
       recomputeTier3FromFilters();
       runServiceLineComparison();
-      renderCodingRisk();
     });
     var el_btn_clear_filters = document.getElementById("btn_clear_filters");
     if (el_btn_clear_filters) el_btn_clear_filters.addEventListener("click", ()=>{
       if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
-      tier3Filter = {service_line:"All", unit_id:"All", exemplar:"All"};
+      tier3Filter = {service_line:"All", unit_id:"All"};
       document.getElementById("flt_service_line").value = "All";
       document.getElementById("flt_unit_id").value = "All";
-      if (document.getElementById("flt_exemplar")) document.getElementById("flt_exemplar").value = "All";
       recomputeTier3FromFilters();
       runServiceLineComparison();
-      renderCodingRisk();
     });
     var el_btn_run_compare = document.getElementById("btn_run_compare");
     if (el_btn_run_compare) el_btn_run_compare.addEventListener("click", runServiceLineComparison);
@@ -2594,6 +2770,7 @@ function renderCodingRisk(){
       window.addEventListener('load', ()=>{ try{ updateAll(); }catch(e){} });
       setTimeout(()=>{ try{ updateAll(); }catch(e){} }, 250);
       renderTier3Drilldown();
+      try{ runServiceLineComparison(); renderCodingRisk(); }catch(e){}
       runServiceLineComparison();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
