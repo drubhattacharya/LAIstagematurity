@@ -579,7 +579,7 @@
   let SIM_MODE = false;      // whether simulation is applied
 
   // Tier 3 filters and comparison state
-  let tier3Filter = {service_line: 'All', unit_id: 'All'};
+  let tier3Filter = {service_line: 'All', unit_id: 'All', exemplar: 'All'};
   let tier3Compare = {a: 'All', b: 'All'};
 
   function setMode(mode, computeModeLabel){
@@ -828,6 +828,8 @@
     if (view === "overview") updateAll();
       renderTier3Drilldown();
       runServiceLineComparison();
+      renderCodingRisk();
+        renderCodingRisk();
       var ct=document.getElementById('tier3_compare_table');
       if(ct){ct.innerHTML = "<tr><th>Pillar</th><th>Compare A</th><th>Compare B</th><th>Δ</th></tr><tr><td colspan='4'>Upload an encounter-level dataset to enable comparison.</td></tr>";}
     window.scrollTo({top:0, behavior:"smooth"});
@@ -2047,12 +2049,18 @@
   function populateFilterOptions(rows){
     const sl = uniq(rows.map(r=>String(getField(r,"service_line") ?? "").trim()).filter(s=>s));
     const un = uniq(rows.map(r=>String(getField(r,"unit_id") ?? "").trim()).filter(s=>s));
+    const ex = uniq(rows.map(r=>{
+      const a = String(getField(r,'exemplar_name') ?? '').trim();
+      const b = String(getField(r,'diagnosis_category') ?? '').trim();
+      return a || b;
+    }).filter(s=>s));
 
     const fltSL = document.getElementById("flt_service_line");
     const fltU = document.getElementById("flt_unit_id");
+    const fltE = document.getElementById("flt_exemplar");
     const cmpA = document.getElementById("cmp_a");
     const cmpB = document.getElementById("cmp_b");
-    if (!fltSL || !fltU || !cmpA || !cmpB) return;
+    if (!fltSL || !fltU || !fltE || !cmpA || !cmpB) return;
 
     function setSelect(sel, options, includeAll=true){
       const prev = sel.value || "All";
@@ -2071,6 +2079,7 @@
 
     setSelect(fltSL, sl, true);
     setSelect(fltU, un, true);
+    setSelect(fltE, ex, true);
     setSelect(cmpA, ["All", ...sl].filter((v,i,a)=>a.indexOf(v)===i), false);
     setSelect(cmpB, ["All", ...sl].filter((v,i,a)=>a.indexOf(v)===i), false);
 
@@ -2079,19 +2088,21 @@
     if (cmpB.value === "All") cmpB.value = sl[1] || sl[0] || "All";
   }
 
-  function subsetRows(rows, serviceLine, unitId){
+  function subsetRows(rows, serviceLine, unitId, exemplar){
     return rows.filter(r=>{
       const sl = String(getField(r,"service_line") ?? "").trim();
       const u = String(getField(r,"unit_id") ?? "").trim();
       const okSL = (!serviceLine || serviceLine==="All") ? true : sl === serviceLine;
       const okU  = (!unitId || unitId==="All") ? true : u === unitId;
-      return okSL && okU;
+      const exv = (String(getField(r,'exemplar_name') ?? '').trim() || String(getField(r,'diagnosis_category') ?? '').trim());
+      const okE = (!exemplar || exemplar==="All") ? true : exv === exemplar;
+      return okSL && okU && okE;
     });
   }
 
   function recomputeTier3FromFilters(){
     if (!window.__lastEncounterRows) return;
-    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id);
+    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id, tier3Filter.exemplar);
     const computed = computeFromEncounterRows(rows);
     tier3Baseline = computed;
     tier3Sim = null;
@@ -2120,8 +2131,8 @@
     const cmpB = document.getElementById("cmp_b")?.value || "All";
     tier3Compare = {a: cmpA, b: cmpB};
 
-    const rowsA = subsetRows(window.__lastEncounterRows, cmpA, tier3Filter.unit_id);
-    const rowsB = subsetRows(window.__lastEncounterRows, cmpB, tier3Filter.unit_id);
+    const rowsA = subsetRows(window.__lastEncounterRows, cmpA, tier3Filter.unit_id, tier3Filter.exemplar);
+    const rowsB = subsetRows(window.__lastEncounterRows, cmpB, tier3Filter.unit_id, tier3Filter.exemplar);
     const compA = computeFromEncounterRows(rowsA);
     const compB = computeFromEncounterRows(rowsB);
 
@@ -2250,6 +2261,266 @@
   }
 
 
+  
+  // ---- Coding & Revenue Risk (Tier 3) ----
+  function pearson(xs, ys){
+    const pairs = [];
+    for (let i=0;i<xs.length;i++){
+      const x=xs[i], y=ys[i];
+      if (x===null || y===null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+      pairs.push([x,y]);
+    }
+    if (pairs.length < 5) return null;
+    const n = pairs.length;
+    const mx = pairs.reduce((s,p)=>s+p[0],0)/n;
+    const my = pairs.reduce((s,p)=>s+p[1],0)/n;
+    let cov=0, vx=0, vy=0;
+    for (const [x,y] of pairs){
+      cov += (x-mx)*(y-my);
+      vx  += (x-mx)*(x-mx);
+      vy  += (y-my)*(y-my);
+    }
+    if (vx<=0 || vy<=0) return null;
+    return cov / Math.sqrt(vx*vy);
+  }
+
+  function codingRiskMetrics(rows){
+    const ynf = (r, key)=> yn(getField(r,key));
+    const numf = (r, key)=> num(getField(r,key));
+
+    const docSupports = rows.map(r=>ynf(r,"doc_em_mdm_time_complete"));
+    const valid = docSupports.filter(v=>v!==null);
+    const docSupportsPct = valid.length ? 100*(valid.reduce((s,v)=>s+(v||0),0)/valid.length) : null;
+
+    let teachPct = null;
+    {
+      let sw=0, sx=0;
+      for (const r of rows){
+        if (!(ynf(r,"has_gc")===1 || ynf(r,"has_ge")===1)) continue;
+        sw += 1;
+        sx += (ynf(r,"doc_teaching_attestation_complete")===1) ? 1 : 0;
+      }
+      teachPct = sw>0 ? 100*(sx/sw) : null;
+    }
+
+    let critPct = null;
+    {
+      let sw=0, sx=0;
+      for (const r of rows){
+        if (ynf(r,"has_99291")!==1) continue;
+        sw += 1;
+        const ok = (ynf(r,"critical_care_met_definition_documented")===1 &&
+                    ynf(r,"critical_care_activities_documented")===1 &&
+                    numf(r,"critical_care_time_minutes_documented")!==null);
+        sx += ok ? 1 : 0;
+      }
+      critPct = sw>0 ? 100*(sx/sw) : null;
+    }
+
+    let ccmPct = null;
+    {
+      let sw=0, sx=0;
+      for (const r of rows){
+        if (ynf(r,"has_ccm")!==1) continue;
+        sw += 1;
+        const ok = (ynf(r,"ccm_patient_consent_documented")===1 &&
+                    ynf(r,"ccm_care_plan_documented")===1 &&
+                    numf(r,"ccm_time_minutes_documented")!==null);
+        sx += ok ? 1 : 0;
+      }
+      ccmPct = sw>0 ? 100*(sx/sw) : null;
+    }
+
+    let tcmPct = null;
+    {
+      let sw=0, sx=0;
+      for (const r of rows){
+        if (ynf(r,"has_tcm")!==1) continue;
+        sw += 1;
+        const ok = (ynf(r,"tcm_discharge_date_documented")===1 &&
+                    ynf(r,"tcm_interactive_contact_made")===1 &&
+                    ynf(r,"tcm_face_to_face_visit_completed")===1);
+        sx += ok ? 1 : 0;
+      }
+      tcmPct = sw>0 ? 100*(sx/sw) : null;
+    }
+
+    const riskSignals = [
+      {name:"E/M defensibility complete", goodPct: docSupportsPct, weight:2},
+      {name:"Teaching attestation complete (GC/GE)", goodPct: teachPct, weight:2},
+      {name:"Critical care docs sufficient (99291)", goodPct: critPct, weight:3},
+      {name:"CCM docs complete", goodPct: ccmPct, weight:3},
+      {name:"TCM docs complete", goodPct: tcmPct, weight:3},
+    ];
+
+    let sw=0, sx=0;
+    for (const s of riskSignals){
+      if (s.goodPct===null || s.goodPct===undefined) continue;
+      sw += s.weight;
+      sx += s.weight * (100 - clamp(s.goodPct,0,100));
+    }
+    const riskIndex = sw>0 ? (sx/sw) : null;
+
+    const tasks = rows.map(r=>numf(r,"attendant_tasks_count"));
+    const docIndex = rows.map(r=>{
+      const a=ynf(r,"doc_em_mdm_time_complete");
+      const b=ynf(r,"mdm_data_review_documents_present");
+      const c=ynf(r,"mdm_independent_interpretation_documented");
+      const d=ynf(r,"mdm_discussion_external_provider_documented");
+      const arr=[a,b,c,d].filter(v=>v!==null);
+      if (!arr.length) return null;
+      return 100*(arr.reduce((s,v)=>s+v,0)/arr.length);
+    });
+    const delay = rows.map(r=>numf(r,"interpreter_delay_minutes"));
+
+    const r1 = pearson(docIndex, tasks);
+    const r2 = pearson(delay, tasks);
+
+    return {riskSignals, riskIndex, corr:{doc_vs_rework:r1, delay_vs_rework:r2}};
+  }
+
+  
+  function getRiskAssumptions(){
+    const a = (id, def)=>{
+      const el = document.getElementById(id);
+      const v = el ? Number(el.value) : def;
+      return Number.isFinite(v) ? v : def;
+    };
+    return { cc: a("risk_amt_cc", 250), teach: a("risk_amt_teach", 60), ccm: a("risk_amt_ccm", 45), tcm: a("risk_amt_tcm", 90) };
+  }
+
+  function renderRevenueAtRisk(rows){
+    const tbl = document.getElementById("revenue_risk_table");
+    const note = document.getElementById("revenue_risk_note");
+    if (!tbl || !note) return;
+
+    if (!rows || !rows.length){
+      tbl.innerHTML = "<tr><th>Domain</th><th>Eligible</th><th>Incomplete</th><th>Incomplete rate</th><th>$/encounter</th><th>Est. $ at risk</th></tr><tr><td colspan='6'>—</td></tr>";
+      return;
+    }
+
+    const ynf = (r, key)=> yn(getField(r,key));
+    const numf = (r, key)=> num(getField(r,key));
+    const A = getRiskAssumptions();
+
+    const domains = [];
+
+    // Critical care (99291)
+    {
+      let eligible=0, incomplete=0;
+      for (const r of rows){
+        if (ynf(r,"has_99291")!==1) continue;
+        eligible += 1;
+        const ok = (ynf(r,"critical_care_met_definition_documented")===1 &&
+                    ynf(r,"critical_care_activities_documented")===1 &&
+                    numf(r,"critical_care_time_minutes_documented")!==null);
+        if (!ok) incomplete += 1;
+      }
+      domains.push({name:"Critical care (99291) documentation", eligible, incomplete, amt:A.cc});
+    }
+
+    // Teaching physician attestation (GC/GE)
+    {
+      let eligible=0, incomplete=0;
+      for (const r of rows){
+        const elig = (ynf(r,"has_gc")===1 || ynf(r,"has_ge")===1);
+        if (!elig) continue;
+        eligible += 1;
+        const ok = (ynf(r,"doc_teaching_attestation_complete")===1);
+        if (!ok) incomplete += 1;
+      }
+      domains.push({name:"Teaching physician attestation (GC/GE)", eligible, incomplete, amt:A.teach});
+    }
+
+    // CCM
+    {
+      let eligible=0, incomplete=0;
+      for (const r of rows){
+        if (ynf(r,"has_ccm")!==1) continue;
+        eligible += 1;
+        const ok = (ynf(r,"ccm_patient_consent_documented")===1 &&
+                    ynf(r,"ccm_care_plan_documented")===1 &&
+                    numf(r,"ccm_time_minutes_documented")!==null);
+        if (!ok) incomplete += 1;
+      }
+      domains.push({name:"Chronic Care Management (CCM) completeness", eligible, incomplete, amt:A.ccm});
+    }
+
+    // TCM
+    {
+      let eligible=0, incomplete=0;
+      for (const r of rows){
+        if (ynf(r,"has_tcm")!==1) continue;
+        eligible += 1;
+        const ok = (ynf(r,"tcm_discharge_date_documented")===1 &&
+                    ynf(r,"tcm_interactive_contact_made")===1 &&
+                    ynf(r,"tcm_face_to_face_visit_completed")===1);
+        if (!ok) incomplete += 1;
+      }
+      domains.push({name:"Transitional Care Management (TCM) completeness", eligible, incomplete, amt:A.tcm});
+    }
+
+    const lines = [];
+    lines.push("<tr><th>Domain</th><th>Eligible</th><th>Incomplete</th><th>Incomplete rate</th><th>$/encounter</th><th>Est. $ at risk</th></tr>");
+    let total=0;
+    for (const d of domains){
+      const rate = d.eligible>0 ? (d.incomplete/d.eligible) : 0;
+      const risk = d.incomplete * d.amt;
+      total += risk;
+      lines.push(`<tr>
+        <td><b>${d.name}</b></td>
+        <td>${d.eligible.toLocaleString()}</td>
+        <td>${d.incomplete.toLocaleString()}</td>
+        <td>${(rate*100).toFixed(0)}%</td>
+        <td>$${d.amt.toLocaleString()}</td>
+        <td>$${risk.toLocaleString()}</td>
+      </tr>`);
+    }
+    lines.push(`<tr><td colspan="6" class="small"><b>Total estimated revenue-at-risk</b>: $${total.toLocaleString()} (educational estimate)</td></tr>`);
+    tbl.innerHTML = lines.join("");
+    note.textContent = `Scope: ${rows.length.toLocaleString()} encounters (filters applied). Assumptions: CC=$${A.cc}, Teach=$${A.teach}, CCM=$${A.ccm}, TCM=$${A.tcm}.`;
+  }
+
+function renderCodingRisk(){
+    const tbl = document.getElementById("coding_risk_table");
+    const corrTbl = document.getElementById("coding_corr_table");
+    const note = document.getElementById("coding_risk_note");
+    if (!tbl || !corrTbl || !note) return;
+
+    if (!window.__lastEncounterRows){
+      tbl.innerHTML = "<tr><th>Indicator</th><th>Value</th></tr><tr><td colspan='2'>Upload an encounter-level dataset.</td></tr>";
+      corrTbl.innerHTML = "<tr><th>Correlation</th><th>r</th></tr><tr><td colspan='2'>—</td></tr>";
+      note.textContent = "Upload encounter-level data to populate.";
+      return;
+    }
+
+    const rows = subsetRows(window.__lastEncounterRows, tier3Filter.service_line, tier3Filter.unit_id, tier3Filter.exemplar);
+    const m = codingRiskMetrics(rows);
+
+    const lines = [];
+    lines.push("<tr><th>Indicator</th><th>Good documentation rate</th><th>Risk (100-good)</th></tr>");
+    for (const s of m.riskSignals){
+      if (s.goodPct===null || s.goodPct===undefined) continue;
+      lines.push(`<tr><td><b>${s.name}</b></td><td>${s.goodPct.toFixed(0)}%</td><td>${(100-s.goodPct).toFixed(0)}</td></tr>`);
+    }
+    if (m.riskIndex!==null){
+      lines.push(`<tr><td colspan="3" class="small"><b>Revenue Risk Index (0–100)</b>: ${m.riskIndex.toFixed(0)} (higher = more exposure)</td></tr>`);
+    }
+    tbl.innerHTML = lines.join("");
+
+    const c = m.corr;
+    const fmt = (r)=> (r===null ? "—" : (Math.round(r*100)/100).toFixed(2));
+    const clines = [];
+    clines.push("<tr><th>Correlation (proxy)</th><th>r</th><th>Interpretation</th></tr>");
+    clines.push(`<tr><td>Documentation completeness vs rework (attendant_tasks_count)</td><td>${fmt(c.doc_vs_rework)}</td><td class="small">${c.doc_vs_rework===null ? "—" : (c.doc_vs_rework<0 ? "Better documentation associated with less rework." : "Higher documentation associated with more rework (check workflow).")}</td></tr>`);
+    clines.push(`<tr><td>Interpreter delay vs rework (attendant_tasks_count)</td><td>${fmt(c.delay_vs_rework)}</td><td class="small">${c.delay_vs_rework===null ? "—" : (c.delay_vs_rework>0 ? "More delay associated with more rework." : "Less delay associated with more rework (check context).")}</td></tr>`);
+    corrTbl.innerHTML = clines.join("");
+
+    note.textContent = `Computed on ${rows.length.toLocaleString()} encounters (filtered scope).`;
+    renderRevenueAtRisk(rows);
+  }
+
+
   // ---- Wire controls ----
   function wire(){
     document.querySelectorAll(".tabbtn").forEach(btn=> btn.addEventListener("click", ()=> setActiveView(btn.dataset.view)));
@@ -2281,17 +2552,21 @@
       if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
       tier3Filter.service_line = document.getElementById("flt_service_line").value || "All";
       tier3Filter.unit_id = document.getElementById("flt_unit_id").value || "All";
+      tier3Filter.exemplar = (document.getElementById("flt_exemplar")?.value) || "All";
       recomputeTier3FromFilters();
       runServiceLineComparison();
+      renderCodingRisk();
     });
     var el_btn_clear_filters = document.getElementById("btn_clear_filters");
     if (el_btn_clear_filters) el_btn_clear_filters.addEventListener("click", ()=>{
       if(!window.__lastEncounterRows) { showErr("Upload an encounter-level dataset first."); return; }
-      tier3Filter = {service_line:"All", unit_id:"All"};
+      tier3Filter = {service_line:"All", unit_id:"All", exemplar:"All"};
       document.getElementById("flt_service_line").value = "All";
       document.getElementById("flt_unit_id").value = "All";
+      if (document.getElementById("flt_exemplar")) document.getElementById("flt_exemplar").value = "All";
       recomputeTier3FromFilters();
       runServiceLineComparison();
+      renderCodingRisk();
     });
     var el_btn_run_compare = document.getElementById("btn_run_compare");
     if (el_btn_run_compare) el_btn_run_compare.addEventListener("click", runServiceLineComparison);
